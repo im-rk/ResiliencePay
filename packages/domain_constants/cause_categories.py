@@ -8,3 +8,4 @@ class CauseCategoryEnum(str, Enum):
     MANDATE_INACTIVE = "mandate_inactive"
     HARD_DECLINE = "hard_decline"
     CUSTOMER_CANCELLED = "customer_cancelled"
+    UNKNOWN = "unknown"
