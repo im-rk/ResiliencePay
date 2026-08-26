@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 from typing import Literal, Optional
 from packages.domain_constants.cause_categories import CauseCategoryEnum
