@@ -1,0 +1,15 @@
+{
+  "run_id": "run_20260827_demo_bandit",
+  "policy": "bandit",
+  "dataset_ref": "seed=42,n=200",
+  "random_seed": 42,
+  "n_events": 200,
+  "recovery_rate": 0.5400,
+  "amount_at_risk": 98650000,
+  "amount_recovered": 54200000,
+  "pct_recovered": 54.94,
+  "avg_time_to_recovery_hrs": 14.8,
+  "exception_count": 92,
+  "gate_blocked_count": 8,
+  "status": "completed"
+}

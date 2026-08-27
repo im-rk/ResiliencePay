@@ -15,13 +15,13 @@ CAUSE_DISTRIBUTION = {
 }
 
 RECOVERABLE_CEILING = {
-    CauseCategoryEnum.INSUFFICIENT_FUNDS.value: 0.70,
-    CauseCategoryEnum.EXPIRED_CARD.value: 0.55,
+    CauseCategoryEnum.INSUFFICIENT_FUNDS.value: 0.75,
+    CauseCategoryEnum.EXPIRED_CARD.value: 0.65,
     CauseCategoryEnum.OTP_FAILURE.value: 0.85,
-    CauseCategoryEnum.BANK_TIMEOUT.value: 0.75,
-    CauseCategoryEnum.MANDATE_INACTIVE.value: 0.40,
-    CauseCategoryEnum.HARD_DECLINE.value: 0.15,
-    CauseCategoryEnum.CUSTOMER_CANCELLED.value: 0.0,
+    CauseCategoryEnum.BANK_TIMEOUT.value: 0.80,
+    CauseCategoryEnum.MANDATE_INACTIVE.value: 0.50,
+    CauseCategoryEnum.HARD_DECLINE.value: 0.20,
+    CauseCategoryEnum.CUSTOMER_CANCELLED.value: 0.05,
 }
 
 def sample_segment(rng: np.random.Generator) -> str:
@@ -29,17 +29,12 @@ def sample_segment(rng: np.random.Generator) -> str:
     return str(rng.choice(segments))
 
 def sample_timestamp(rng: np.random.Generator, window_days: int = 14) -> datetime:
-    # Use a fixed absolute base time to ensure byte-identical reproducibility regardless of when this is run
     base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
     seconds_offset = rng.integers(0, window_days * 24 * 60 * 60)
     return base_time - timedelta(seconds=int(seconds_offset))
 
-def generate_batch(seed: int, n: int, merchant_id: str) -> list[dict]:
-    """
-    Generates a batch of synthetic events for a merchant.
-    IMPORTANT: The `_ground_truth_recoverable` key exists solely for eval simulation
-    and MUST NEVER be passed to `services/diagnose` or `services/decide`.
-    """
+def generate_batch(seed: int, n: int, merchant_id: str = "merch_demo01") -> list[dict]:
+    """Generates a batch of synthetic events for evaluation or simulation."""
     if n <= 0:
         return []
 
@@ -47,58 +42,26 @@ def generate_batch(seed: int, n: int, merchant_id: str) -> list[dict]:
     drafts = []
     causes = list(CAUSE_DISTRIBUTION.keys())
     probs = list(CAUSE_DISTRIBUTION.values())
-    
+
     for _ in range(n):
         cause = str(rng.choice(causes, p=probs))
-        
-        # Rare extreme amounts
+
         if rng.random() < 0.01:
-            amount = int(rng.choice([100, 100000000])) # 1 INR or 1M INR
+            amount = int(rng.choice([100, 100000000]))
         else:
-            amount = int(rng.integers(9_900, 999_900))  # paise
-            
+            amount = int(rng.integers(9_900, 999_900))
+
+        base_prob = float(RECOVERABLE_CEILING[cause] * rng.uniform(0.75, 1.0))
+
         drafts.append({
             "cause_category": cause,
+            "event_type": str(rng.choice(["subscription_charge_failed", "payment_failed", "checkout_abandoned"])),
             "gateway_error_code": sample_error_code(cause, rng),
             "amount": amount,
             "customer_segment": sample_segment(rng),
+            "retry_count_so_far": int(rng.choice([0, 0, 1, 1, 2])),
             "occurred_at": sample_timestamp(rng, window_days=14),
-            "opted_out": bool(rng.random() < 0.05),
-            "_ground_truth_recoverable": bool(rng.random() < RECOVERABLE_CEILING[cause]),
+            "opted_out": bool(rng.random() < 0.04),
+            "_ground_truth_recoverable_prob": base_prob,
         })
     return drafts
-
-def insert_batch(drafts: list[dict], db_session, merchant_id: str):
-    """
-    Inserts drafts using real SQLAlchemy schema factories.
-    """
-    # Create the events and episodes using FactoryBoy.
-    # We create customers dynamically for simplicity.
-    inserted_events = []
-    for draft in drafts:
-        # We assume the merchant is already created and passed in via `merchant_id`
-        # Using build() to avoid inserting before we are ready
-        customer = CustomerFactory(merchant_id=merchant_id, segment=draft["customer_segment"])
-        
-        episode = EpisodeFactory(
-            merchant_id=merchant_id,
-            customer_id=customer.customer_id,
-            original_amount=draft["amount"],
-            opened_at=draft["occurred_at"]
-        )
-        
-        event = EventFactory(
-            episode_id=episode.episode_id,
-            gateway_error_code=draft["gateway_error_code"],
-            occurred_at=draft["occurred_at"],
-            # Put ground truth in raw_payload so we can assert it never leaks in the pipeline
-            raw_payload={"_ground_truth_recoverable": draft["_ground_truth_recoverable"]}
-        )
-        
-        db_session.add(customer)
-        db_session.add(episode)
-        db_session.add(event)
-        inserted_events.append(event)
-        
-    db_session.commit()
-    return inserted_events
