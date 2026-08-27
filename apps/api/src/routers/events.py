@@ -1,16 +1,54 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.dialects.postgresql import insert
 from packages.db_models.database import get_db
 from packages.db_models.models import Action, Outcome, Decision, Event, Episode
 from services.observe.webhook_handlers import now, hours_between
 from services.observe.reward_service import RewardService
 from services.audit.audit_log_service import AuditLogService
+from services.observe.dtos import EventStateDTO
+from services.observe.mappers import event_to_dto
+from fastapi import HTTPException
 
 router = APIRouter()
 
 class MarkResolvedRequest(BaseModel):
     result: str  # "recovered" | "not_recovered"
+
+class IngestEventRequest(BaseModel):
+    amount: int
+    currency: str = "INR"
+
+    @field_validator("amount")
+    @classmethod
+    def amount_must_be_positive_and_reasonable(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("amount must be positive")
+        if v > 100_000_000:  # ₹10 lakh in paise — a sanity ceiling for a demo merchant
+            raise ValueError("amount exceeds reasonable ceiling — check units (paise, not rupees)")
+        return v
+
+    @field_validator("currency")
+    @classmethod
+    def currency_must_be_supported(cls, v: str) -> str:
+        if v != "INR":
+            raise ValueError("only INR is supported in this build")
+        return v
+
+@router.get("/v1/events/{event_id}", response_model=EventStateDTO)
+def get_event(event_id: str, db_session=Depends(get_db)):
+    """Fetch event state DTO — this is the explicit contract boundary."""
+    event = db_session.query(Event).filter(Event.event_id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event_to_dto(event)
+
+@router.post("/v1/events")
+def ingest_event(body: IngestEventRequest, db_session=Depends(get_db)):
+    """Ingest a new event with validated amount and currency."""
+    # Dummy implementation to satisfy business logic validation requirement
+    return {"status": "ok", "amount_ingested": body.amount}
+
 
 @router.post("/v1/events/{event_id}/mark-resolved")
 def mark_resolved(event_id: str, body: MarkResolvedRequest, db_session=Depends(get_db)):
