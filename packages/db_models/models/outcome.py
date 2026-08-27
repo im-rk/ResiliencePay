@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, BigInteger, Numeric, DateTime, text, ForeignKey, CheckConstraint, Index
+from sqlalchemy import Column, String, BigInteger, Numeric, DateTime, text, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from packages.db_models.database import Base
 
@@ -16,4 +16,5 @@ class Outcome(Base):
 
     __table_args__ = (
         CheckConstraint('amount_recovered >= 0', name='chk_amount_recovered'),
+        UniqueConstraint('action_id', name='uq_outcome_action'),
     )
