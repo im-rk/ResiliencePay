@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, BigInteger, Numeric, DateTime, text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from packages.db_models.database import Base
@@ -10,7 +11,12 @@ class BatchRun(Base):
     policy = Column(String, nullable=False)
     dataset_ref = Column(String, nullable=False)
     random_seed = Column(Integer, nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=False, server_default=text('now()'))
+    started_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=text('now()')
+    )
     finished_at = Column(DateTime(timezone=True))
 
 
