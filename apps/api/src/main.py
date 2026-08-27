@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import structlog
 import re
 import os
+
+from apps.api.src.middleware.error_handler import register_error_handlers
 from apps.api.src.middleware.request_id import RequestIDMiddleware
-from apps.api.src.routers import events, admin
+from apps.api.src.routers import events, batch, metrics, audit, admin
 
 SECRET_PATTERNS = [re.compile(r"(key_secret|api_key|password|ADMIN_SECRET)=\S+", re.IGNORECASE)]
 
@@ -19,8 +21,8 @@ def redact_secrets_processor(logger, method_name, event_dict):
 structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,
-        redact_secrets_processor, 
-        structlog.dev.ConsoleRenderer() if os.environ.get("ENVIRONMENT") == "development" else structlog.processors.JSONRenderer()
+        redact_secrets_processor,
+        structlog.dev.ConsoleRenderer() if os.environ.get("ENVIRONMENT") == "development" else structlog.processors.JSONRenderer(),
     ]
 )
 
@@ -28,9 +30,12 @@ logger = structlog.get_logger()
 
 app = FastAPI(
     title="ResiliencePay API",
-    description="API for the AI Revenue Recovery Agent",
+    description="API for the AI Revenue Recovery Agent — Detect, Diagnose, Decide, Act, Observe",
     version="0.1.0",
 )
+
+# Register structured domain and exception error handlers
+register_error_handlers(app)
 
 # Configure CORS for dashboard
 cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
@@ -44,15 +49,24 @@ app.add_middleware(
 
 app.add_middleware(RequestIDMiddleware)
 
-app.include_router(events.router)
-app.include_router(admin.router)
+# Include all core routers under /v1
+app.include_router(events.router, prefix="/v1", tags=["events"])
+app.include_router(batch.router, prefix="/v1", tags=["batch"])
+app.include_router(metrics.router, prefix="/v1", tags=["metrics"])
+app.include_router(audit.router, prefix="/v1", tags=["audit"])
+app.include_router(admin.router, prefix="/v1", tags=["admin"])
 
 
+@app.get("/healthz")
 @app.get("/health")
-async def health_check():
-    logger.info("Health check called")
+def health_check():
     return {"status": "ok", "service": "resiliencepay-api"}
 
+
 @app.get("/")
-async def root():
-    return {"message": "Welcome to ResiliencePay API"}
+def root():
+    return {
+        "message": "Welcome to ResiliencePay API",
+        "docs_url": "/docs",
+        "version": "0.1.0",
+    }
