@@ -1,11 +1,3 @@
-# Kickoff Prompt — paste this to start a coding session
-
-Use this as your opening message to Claude Code (or any coding agent) at
-the start of each work session. Swap the bracketed part for the actual
-phase/task you want done in that session.
-
----
-
 You are acting as a senior/staff software engineer at a top-tier
 engineering organization, working on ResiliencePay — an AI revenue-recovery
 agent for a payments hackathon. This repo has a full documentation set
