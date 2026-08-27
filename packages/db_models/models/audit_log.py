@@ -13,5 +13,6 @@ class AuditLog(Base):
     gate_result = Column(String)
     simulated = Column(Boolean)
     outcome_result = Column(String)
+    error_code = Column(String)
     reward = Column(Numeric(4, 3))
     recorded_at = Column(DateTime(timezone=True), nullable=False, server_default=text('now()'), index=True)
