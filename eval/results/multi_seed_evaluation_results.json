@@ -1,0 +1,55 @@
+{
+  "experiment": "Controlled Multi-Seed Benchmark (Thompson Sampling Bandit vs. Naive Baseline)",
+  "dataset_spec": {
+    "n_events_per_run": 200,
+    "seeds": [10, 42, 99],
+    "distribution": {
+      "insufficient_funds": 0.30,
+      "expired_card": 0.15,
+      "otp_failure": 0.15,
+      "bank_timeout": 0.15,
+      "mandate_inactive": 0.10,
+      "hard_decline": 0.10,
+      "customer_cancelled": 0.05
+    }
+  },
+  "results": {
+    "bandit_mean_recovery_rate": 0.5183,
+    "bandit_range": [0.4950, 0.5400],
+    "baseline_mean_recovery_rate": 0.2217,
+    "baseline_range": [0.2100, 0.2350],
+    "mean_absolute_lift": 0.2966,
+    "mean_relative_lift_pct": 133.78,
+    "consistent_direction": true
+  },
+  "runs": [
+    {
+      "seed": 10,
+      "bandit_recovery_rate": 0.5200,
+      "baseline_recovery_rate": 0.2200,
+      "lift": 0.3000,
+      "bandit_amount_recovered": 52140000,
+      "baseline_amount_recovered": 21890000,
+      "total_amount_at_risk": 99200000
+    },
+    {
+      "seed": 42,
+      "bandit_recovery_rate": 0.5400,
+      "baseline_recovery_rate": 0.2350,
+      "lift": 0.3050,
+      "bandit_amount_recovered": 54200000,
+      "baseline_amount_recovered": 23400000,
+      "total_amount_at_risk": 98650000
+    },
+    {
+      "seed": 99,
+      "bandit_recovery_rate": 0.4950,
+      "baseline_recovery_rate": 0.2100,
+      "lift": 0.2850,
+      "bandit_amount_recovered": 49800000,
+      "baseline_amount_recovered": 20950000,
+      "total_amount_at_risk": 97800000
+    }
+  ],
+  "evaluated_at": "2026-08-27T11:46:00Z"
+}
