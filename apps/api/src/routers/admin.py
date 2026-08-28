@@ -8,7 +8,16 @@ def require_admin_secret(x_admin_secret: str = Header(...)):
     if x_admin_secret != admin_secret:
         raise HTTPException(status_code=403, detail="forbidden")
 
+from pydantic import BaseModel
+
+class FaultInjectionPayload(BaseModel):
+    enabled: bool
+    rate: float = 0.0
+
 @router.post("/v1/admin/fault-injection", dependencies=[Depends(require_admin_secret)])
-def toggle_fault_injection():
+def toggle_fault_injection(payload: FaultInjectionPayload):
     """Live trigger for admin fault injection."""
-    return {"status": "ok", "message": "Fault injection toggled"}
+    from packages.config.settings import settings
+    settings.fault_injection_enabled = payload.enabled
+    settings.fault_injection_rate = payload.rate
+    return {"status": "ok", "message": "Fault injection toggled", "enabled": payload.enabled, "rate": payload.rate}
