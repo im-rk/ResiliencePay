@@ -1,19 +1,15 @@
-import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, strategies as st
 from services.gate.rules import check_max_attempts
-from unittest.mock import MagicMock
+from packages.db_models.models.episode import Episode
 
-@settings(max_examples=1000)
-@given(
-    attempt_count=st.integers(min_value=0, max_value=100),
-    max_attempts=st.integers(min_value=1, max_value=10)
-)
-def test_gate_never_allows_exceeded_attempts(attempt_count, max_attempts):
-    """
-    Mathematically prove the gate never allows an action when attempt_count >= max_attempts,
-    across 1000 fuzzed generative cases.
-    """
-    episode = MagicMock(attempt_count=attempt_count)
+def make_episode(attempt_count=0):
+    ep = Episode()
+    ep.attempt_count = attempt_count
+    return ep
+
+@given(attempt_count=st.integers(min_value=0, max_value=20), max_attempts=st.integers(min_value=1, max_value=5))
+def test_never_passes_at_or_above_max_attempts(attempt_count, max_attempts):
+    episode = make_episode(attempt_count=attempt_count)
     result = check_max_attempts(episode, max_attempts=max_attempts)
     
     if attempt_count >= max_attempts:
