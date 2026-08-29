@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 from packages.db_models.models.action import Action
+from services.gate.service import GateResult
 
 # We have to patch load_decision, build_context, evaluate_gate to simulate
 # Phase 4 being evaluated at execution time and blocking it.
@@ -21,8 +22,8 @@ def test_delayed_action_blocks_if_opted_out_since_scheduling(monkeypatch):
     monkeypatch.setattr(task_module, "build_context", lambda event, arm, now: "fake_context")
     
     # Mock evaluate_gate to simulate an opt-out (Gate fails)
-    gate_result = MagicMock(passed=False)
-    monkeypatch.setattr(task_module, "evaluate_gate", lambda ctx: gate_result)
+    gate_result = GateResult(passed=False, rule_triggered="customer_opted_out")
+    monkeypatch.setattr(task_module, "evaluate_gate", lambda ctx, db=None, now=None: gate_result)
     
     # Execute
     task_module.execute_delayed_action_task(decision.decision_id)
