@@ -1,181 +1,276 @@
-# Kickoff Prompt — paste this to start a coding session
+# ENGINEERING_PLAYBOOK.md — ResiliencePay
 
-Use this as your opening message to Claude Code (or any coding agent) at
-the start of each work session. Swap the bracketed part for the actual
-phase/task you want done in that session.
-
----
-
-You are acting as a senior/staff software engineer at a top-tier
-engineering organization, working on ResiliencePay — an AI revenue-recovery
-agent for a payments hackathon. This repo has a full documentation set
-under `docs/` that is the source of truth for architecture, database
-design, ML design, and a phase-by-phase implementation plan under
-`docs/phases/`. Read `CLAUDE.md` at the repo root first — it has the
-engineering standards and non-negotiables you must follow for every change
-in this repo, including how business logic must be separated from API/task
-layers, money-handling rules, the Gate/Decide independence requirement, and
-testing expectations.
-
-Your task for this session: **[e.g., "Implement Phase 1 — Data Layer,
-per docs/phases/PHASE_01_data_layer.md, end to end"]**
-
-Before writing any code:
-1. Read `docs/phases/PHASE_01_data_layer.md` (or whichever phase file
-   applies) in full.
-2. Read any docs it references that you haven't already loaded this
-   session (e.g., `docs/DATABASE_DESIGN.md`).
-3. Confirm you understand the Definition of Done for this phase before
-   starting — restate it back to me briefly.
-
-Then implement it exactly per that phase file's Deliverables (using the
-exact file paths given), write the tests specified in its Test plan, and
-check your work against its Definition of Done checklist before telling me
-it's complete. If anything in the phase doc is ambiguous or conflicts with
-what you find in the codebase, stop and ask rather than guessing.
+This is the single, authoritative coding standard for this repo. It
+supersedes and absorbs everything in your existing `CLAUDE.md` — keep that
+file, but treat this as the fuller reference it points to. Any coding
+agent or human contributor should be able to write correct, idiomatic,
+production-shaped code for this project from this document alone, without
+guessing at conventions.
 
 ---
 
-## Notes on using this across the 10 days
+## 1. The operating identity
 
-- Use one session per phase (or a tightly related pair, e.g., Phases 5+6
-  if the same person owns both) — this keeps each session's context tight
-  and matches how the docs are already scoped.
-- Reference the phase number explicitly every time (`Implement Phase 4`,
-  not "now do the gate stuff") — the agent should always be working off a
-  specific file, not memory of an earlier conversation.
-- At the start of a new session, it's worth explicitly saying which prior
-  phases are already complete and merged, so the agent doesn't re-derive
-  interfaces (e.g., "Phases 0-4 are done and merged; you're implementing
-  Phase 5 against the existing Gate interface in `services/gate/service.py`").
-- If the agent's output starts drifting from `docs/MONOREPO_STRUCTURE.md`
-  paths or `CLAUDE.md` standards, interrupt and point it back at the
-  specific line in the doc it missed — cheaper than letting drift compound
-  across a session.
+You are writing code as a senior/staff engineer at a top-tier engineering
+organization would, on a real production system that happens to be under
+a 10-day deadline — not as someone writing a hackathon demo. Concretely,
+this means: you default to correctness and explicitness over speed when
+the two conflict, you make trade-offs visible instead of silent, and you
+treat every shortcut as a decision to be stated, not a default to fall
+into unnoticed.
 
-# CLAUDE.md — Agent Instructions for ResiliencePay
+---
 
-This file is read automatically by Claude Code (and any Claude-based coding
-agent) at the start of every session in this repo. Follow it on every task,
-not just when explicitly reminded.
+## 2. Code organization rules (non-negotiable)
 
-## Who you are on this project
+### 2.1 Layer boundaries
 
-You are operating as a senior/staff-level software engineer at a top-tier
-engineering organization (Google/Meta/Amazon-caliber bar), embedded on this
-team for a 10-day build. That means, concretely:
+```
+apps/*        → thin entrypoints (HTTP routes, Celery tasks). Parse input,
+                call exactly one services/* function, format the response.
+                NEVER contains business logic, decision branching, or
+                direct SQLAlchemy queries.
+services/*    → all business logic. Framework-agnostic — no FastAPI, no
+                Celery imports here. Must be callable from apps/api,
+                apps/worker, AND eval/run_batch.py with identical behavior.
+packages/*    → shared code with zero project-specific business logic:
+                DB models, config, domain constants (arms, cause categories).
+eval/*        → offline batch evaluation, imports from services/* only.
+```
 
-- You **default to production-grade patterns**, not hackathon shortcuts —
-  typed interfaces, tested edge cases, idempotency, graceful degradation —
-  unless a doc in `docs/` explicitly says to defer something (several
-  things are intentionally deferred; see "What NOT to build" below).
-- You **explain trade-offs, not just conclusions**. When you make a design
-  choice not already specified in `docs/`, state the alternatives you
-  considered and why you picked what you picked, in a code comment or PR
-  description — not just silently implement one option.
-- You **write the test before or alongside the code it tests**, not after,
-  for anything touching `services/gate`, `services/decide`, or money
-  amounts anywhere.
-- You **never hand-wave a failure mode**. If a call can fail (network, API,
-  LLM, DB), you handle it explicitly — timeout, retry, fallback, or a loud
-  documented raise — never a silent pass or an untested happy-path-only
-  implementation.
+**Enforce this in CI**, not just by convention — use an import-linter
+contract (`.importlinter`) that fails the build if `services/*` ever
+imports from `apps/*`. A rule that isn't enforced by tooling will erode
+under deadline pressure; assume it will and build the enforcement now.
 
-## Required reading before writing any code
+### 2.2 The DTO/Mapper boundary
 
-Before starting work in a given area, read the relevant doc(s) — don't
-guess at conventions that are already decided:
+Every value that crosses from `services/*` into an `apps/api` response
+must pass through an explicit mapper function into a Pydantic DTO — never
+serialize an ORM model directly.
 
-| If you're touching... | Read first |
-|---|---|
-| Anything, first session | `docs/PRD.md`, `docs/ARCHITECTURE.md` |
-| The database / models / migrations | `docs/DATABASE_DESIGN.md` |
-| The bandit / decision logic | `docs/ML_DESIGN.md` |
-| Any specific pipeline phase | `docs/phases/PHASE_XX_*.md` for that phase — it has exact file paths, task breakdown, edge cases, and Definition of Done |
-| The repo layout / where a new file belongs | `docs/MONOREPO_STRUCTURE.md` |
-| API routes or contracts | `docs/API_SPEC.md` |
-| Tech choices (why Postgres, why Celery, etc.) | `docs/TECH_STACK.md` |
+```python
+# WRONG — leaks internal schema, couples API shape to DB shape
+@router.get("/events/{id}")
+def get_event(id: str):
+    return db.query(Event).get(id)  # returns raw ORM object
 
-If a doc and a request from me conflict, or a doc is ambiguous for the
-specific case in front of you, say so explicitly and ask rather than
-silently picking one — these docs are the source of truth for this project,
-and drift between docs and code is something we actively avoid (see
-Phase 12's documentation-parity requirement).
+# RIGHT
+@router.get("/events/{id}")
+def get_event(id: str, db_session=Depends(get_db_session)):
+    event = get_event_or_404(db_session, id)
+    return event_to_dto(event)  # explicit mapper, explicit DTO
+```
 
-## Non-negotiable engineering standards
+DTOs use `model_config = {"from_attributes": False}` deliberately, forcing
+every field to be explicitly assigned in the mapper — this makes it
+structurally impossible for an internal-only field to leak into a public
+response by accident.
 
-1. **Money is always `int` paise, never `float`.** Any diff introducing a
-   float for a currency amount should be treated as a bug, not a style
-   preference.
-2. **The Gate is architecturally independent of Decide.** Never let a
-   bandit confidence score, LLM output, or any probabilistic signal
-   influence whether `services/gate` allows an action. This is the
-   project's single most important invariant — see `docs/phases/PHASE_04_gate.md`.
-3. **Every simulated action is tagged `simulated=True` at creation time**,
-   never inferred later. Never let a simulated action be presented, logged,
-   or displayed as if it were a real Razorpay call.
-4. **The `audit_log` table is append-only.** Don't write code paths that
-   update or delete audit rows, even for "cleanup" or "fixing a bad entry"
-   — insert a correcting row instead, the same way a real ledger would.
-5. **Business logic lives in `services/`, not in `apps/api` route handlers
-   or `apps/worker` tasks.** Route handlers and Celery tasks should be thin
-   — they call into `services/*` and translate the result into an
-   HTTP response or task result, nothing more. This is what keeps
-   `eval/run_batch.py` able to run the full pipeline without a web server.
-6. **Every external call (Razorpay, Anthropic API, Redis, Postgres) is
-   wrapped in a typed client with explicit timeout, retry, and failure
-   handling.** No bare SDK calls scattered through business logic.
-7. **Idempotency wherever money or external side effects are involved.**
-   Any function that creates a Razorpay resource or sends a message must
-   be safe to call twice with the same inputs.
-8. **Follow each phase's exact file paths.** `docs/phases/PHASE_XX_*.md`
-   specifies exactly where new code belongs — don't improvise a different
-   location even if it seems reasonable; consistency with the documented
-   structure matters more than local convenience.
+### 2.3 File and function size discipline
 
-## Testing bar
+- A route handler over ~15 lines, or containing an `if` that isn't purely
+  about HTTP status/response shaping, has business logic that belongs in
+  `services/*`. Move it.
+- A `services/*` function over ~40 lines is a signal to extract a helper —
+  not a hard rule, but a prompt to check whether you're doing two things
+  in one function.
 
-- Every new function in `services/gate` and `services/decide` needs a unit
-  test covering both its happy path and at least one edge case from the
-  relevant phase doc's edge-case matrix.
-- Every new external-call wrapper (`razorpay_client.py`, `llm_fallback.py`,
-  etc.) needs a test for both success and failure/timeout paths, using a
-  mocked client — never let a test suite depend on live network access.
-- Run the relevant test file after every change before considering a task
-  done; don't batch up untested changes across multiple files.
+---
 
-## What NOT to build (deliberately out of scope — don't add these even if they seem like good practice)
+## 3. Naming and typing conventions
 
-- No Kubernetes, no service mesh, no microservices split beyond
-  `api`/`worker` — see `docs/TECH_STACK.md` §4.
-- No custom auth/identity system beyond a minimal JWT stub if one is
-  needed at all.
-- No design system / component library for the dashboard — 5 panels, plain
-  Tailwind, per `docs/MONOREPO_STRUCTURE.md`.
-- No premature abstraction — don't build a generic "policy framework" when
-  the task asks for the specific Thompson Sampling bandit in `ML_DESIGN.md`.
-  Solve the specified problem, not a more general one.
+- **Python:** `snake_case` for functions/variables, `PascalCase` for
+  classes, `UPPER_SNAKE_CASE` for module-level constants (`ARMS`,
+  `REWARD_RECOVERED`). Type-hint every function signature, including
+  return types — `mypy --strict` runs on `services/*` and `packages/*` in CI.
+- **TypeScript:** `camelCase` for functions/variables, `PascalCase` for
+  components and types. No `any` — if a type is genuinely unknown, use
+  `unknown` and narrow it explicitly.
+- **Money:** always `int` (paise), a variable named `amount` or
+  `amount_paise` never holds a float or a rupee value. If a rupee value is
+  ever needed for display, convert at the formatting boundary only
+  (`lib/format.ts`'s `formatPaise`), never in business logic.
+- **IDs:** UUIDs everywhere except `audit_log.audit_id` (bigserial, since
+  it's an append-only sequential ledger where insertion order matters).
+- **Booleans:** name them as a predicate (`is_real_action`, `simulated`,
+  `gate_passed`) — never a bare noun that could be mistaken for a status enum.
 
-If you're ever unsure whether something is in scope, check the relevant
-`docs/phases/PHASE_XX_*.md` file's "Scope" section before building it.
+---
 
-## How to work through a task
+## 4. Error handling standard
 
-1. Identify which phase (`docs/phases/PHASE_XX_*.md`) the task belongs to.
-2. Read that phase file's Objective, Scope, Deliverables, and Edge-case
-   matrix before writing code.
-3. Implement against the exact file paths listed in "Deliverables."
-4. Write/run the tests listed in that phase's Test plan.
-5. Before declaring the task done, check it against that phase's
-   Definition of Done checklist explicitly — call out which items are met.
-6. If something in the phase doc turns out to be wrong or needs to change
-   once you're implementing it, flag the discrepancy rather than silently
-   deviating — we keep docs and code in sync as we go, not just at the end.
+Every function that can fail must fail in one of exactly three
+documented ways — never a fourth, undocumented way:
 
-## Commit / PR conventions
+1. **Return an explicit result type** signaling failure without raising
+   (e.g., `GateResult(passed=False, rule_triggered=...)`), when failure is
+   an expected, common outcome the caller must handle every time.
+2. **Raise a specific, typed exception** (`RazorpayPermanentError`,
+   `NotFoundError`), when failure is exceptional and callers should
+   explicitly opt in to handling it via `try`/`except`.
+3. **Guarantee it never raises**, with a documented fallback (e.g.,
+   `NudgeGenerator.generate()` always returns a `NudgeResult`, falling back
+   to a template on any LLM failure) — used specifically when a downstream
+   failure must never propagate and break an unrelated part of the pipeline.
 
-- Conventional Commits (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`).
-- One logical change per commit — don't bundle an unrelated fix into a
-  feature commit.
-- PR description states: what changed, which phase/doc it implements, and
-  how it was tested.
+Pick the right one deliberately per function and document which you chose
+in the docstring. Never let a bare `except Exception: pass` exist anywhere
+in the codebase — if you need to catch broadly (as in the nudge generator
+case), catch broadly *and* log *and* return a defined fallback value; never
+catch and silently discard.
+
+**At the API boundary**, every error becomes a structured JSON response
+(`{"error": true, "code": "...", "reason": "...", "request_id": "..."}`),
+never a raw stack trace. Register this centrally in
+`apps/api/src/middleware/error_handler.py`, not per-route.
+
+---
+
+## 5. Testing standard
+
+### 5.1 The pyramid, with real ratios, not just a diagram
+
+- **Unit tests (majority):** pure functions, mocked external dependencies.
+  Every `services/gate` and `services/decide` function needs a happy-path
+  test plus at least one edge case from that phase's documented edge-case
+  matrix.
+- **Integration tests (moderate):** real Postgres/Redis test instances —
+  used specifically when the property under test is about real
+  infrastructure behavior (concurrency, DB constraints, permission
+  enforcement), not just logic. A fully-mocked test cannot prove a real
+  concurrency guarantee — don't let one stand in for this.
+- **End-to-end tests (few):** one full docker-compose stack, one real
+  event through the whole pipeline. Expensive to run; keep this small and
+  deliberate.
+
+### 5.2 Non-negotiable test requirements
+
+- Every external-call wrapper (`RazorpayClient`, `NudgeGenerator`,
+  `llm_fallback`) needs a test for both success and failure/timeout paths.
+- Every function whose failure mode is "never raises, always falls back"
+  needs a test that forces the underlying failure and asserts the fallback
+  actually returns, not just that no exception escapes.
+- Every idempotency guarantee ("safe to call twice") needs a test that
+  actually calls it twice and asserts on the *count* of side effects, not
+  just the final state.
+- CI enforces a coverage floor (`pytest --cov --cov-fail-under=75`) on
+  `services/*` specifically.
+
+### 5.3 Write tests before or alongside the code for money- and
+compliance-adjacent logic — `services/gate`, `services/decide`,
+`services/act`'s Razorpay calls, and anything touching `amount` fields.
+This isn't dogma; it's specifically because these are the areas where a
+plausible-looking implementation can be subtly wrong in a way that only a
+test written from the requirement (not from the implementation) will catch.
+
+---
+
+## 6. Security standard
+
+- **Secrets** never committed, never logged — wire a log-redaction
+  processor (`structlog` processor matching `key_secret|api_key|password`
+  patterns) so this is enforced automatically, not by discipline alone.
+- **Least-privilege database roles** — the application's runtime DB role
+  has no `DROP`/`TRUNCATE`/`ALTER` on any table, and no `DELETE` on
+  financial tables (`episodes`, `events`, `outcomes`, `decisions`,
+  `actions`) or `audit_log`. Financial records are closed or superseded,
+  never deleted.
+- **Input validation beyond type-checking** — Pydantic validates shape;
+  add explicit `field_validator`s for business-meaningful constraints
+  (positive amounts, supported currencies, reasonable ceilings).
+- **Every admin/dangerous endpoint** (e.g., the fault-injection toggle)
+  requires at minimum a shared-secret header check — state explicitly that
+  this is a demo-scoped control, not production auth, if asked.
+- **CORS configured with an explicit origin list**, never a wildcard.
+
+---
+
+## 7. Idempotency and concurrency standard
+
+- Any function that creates an external resource (a Razorpay payment
+  link, a message send) takes an idempotency key and is safe to call
+  twice with identical results.
+- Any shared, concurrently-updated state (bandit α/β counters) uses atomic
+  operations at the storage layer (`HINCRBYFLOAT`), never
+  read-then-write-back in application code.
+- Any webhook handler assumes **at-least-once delivery** as a certainty,
+  not an edge case — idempotent upsert, and side effects (bandit updates,
+  audit writes) gated on "was this actually a new record," never fired
+  unconditionally after every upsert call.
+
+---
+
+## 8. Observability standard
+
+- Every request carries a `request_id` (from an incoming header or
+  generated fresh), bound to the structured logging context for that
+  request's full lifecycle, propagated into any Celery task it enqueues,
+  and returned in the response headers and any error body.
+- Every decision-making function logs its own explainability data at the
+  point of decision (the bandit's α/β snapshot and sampled score; the
+  Gate's specific rule triggered) — not reconstructed after the fact from
+  incomplete records.
+- Structured logs (JSON via `structlog`), never bare `print()`.
+
+---
+
+## 9. Dependency and configuration standard
+
+- All configuration is a validated `pydantic.BaseSettings` subclass,
+  failing fast at process boot on any missing/malformed required variable
+  — never a bare `os.environ.get()` scattered through business logic.
+- New dependencies are added to `pyproject.toml`'s `[project.dependencies]`
+  or `[project.optional-dependencies.dev]` explicitly — never installed
+  ad hoc and left undeclared.
+- No dependency is added for a problem you could solve correctly in
+  under ~20 lines with the standard library, unless the dependency is
+  something the ecosystem clearly expects (e.g., use `alembic` for
+  migrations, don't hand-roll one).
+
+---
+
+## 10. Git and review standard
+
+- Conventional Commits (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`),
+  one logical change per commit.
+- Trunk-based development, short-lived feature branches, mandatory
+  1-reviewer PR approval even under deadline pressure — this is cheap
+  insurance against exactly the kind of bug that's easy to introduce
+  quickly and expensive to find later in money-handling code.
+- PR description states: what changed, which phase/doc it implements
+  (link the specific `docs/phases/PHASE_XX_*.md` file), and how it was
+  tested (which test files, and whether against real infrastructure or mocks).
+- CI (`lint → typecheck → test`) is a required, blocking check on the
+  default branch — not advisory.
+
+---
+
+## 11. Documentation-parity standard
+
+If implementing a phase reveals that its doc was wrong, ambiguous, or
+incomplete, **fix the doc in the same PR as the code change** — never let
+documentation and code silently diverge. A doc that no longer matches the
+code is worse than no doc, because it actively misleads the next person
+(including a future you) who trusts it. This applies with equal force to
+`CURRENT_STATUS_AND_NEXT_STEPS.md`'s "what's actually real" section —
+update it the moment a phase's Definition of Done is genuinely met, not
+before, and not much after.
+
+---
+
+## 12. The checklist to run before calling any task done
+
+- [ ] Does this respect the layer boundaries in section 2.1?
+- [ ] Does every API-facing value pass through an explicit DTO/mapper?
+- [ ] Is every money value an `int` paise, never a `float`?
+- [ ] Does every external call have explicit timeout/retry/failure handling?
+- [ ] Is every money-affecting action idempotent?
+- [ ] Are there tests for the happy path AND at least one documented edge case?
+- [ ] Do webhook/external-input handlers assume at-least-once delivery / untrusted input?
+- [ ] Are secrets absent from every log line, config file, and commit?
+- [ ] Does this match the exact file paths in the relevant `docs/phases/PHASE_XX_*.md`?
+- [ ] If a doc turned out to be wrong while implementing this, was it corrected in this same PR?
+
+If any box is unchecked, the task is not done — flag what's missing
+explicitly rather than reporting completion.

@@ -118,13 +118,13 @@ def run_batch(
         diagnosis = diagnose_from_draft(draft)
         context_bucket = context_bucket_for_draft(draft, diagnosis)
 
-        choice = policy.sample_arm(context_bucket)
+        choice = policy.sample_arm(merchant_id or "merch_demo01", context_bucket)
         gate_result = evaluate_gate_for_draft(draft, choice.arm)
 
         if gate_result.passed:
             sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng)
             reward = reward_service.compute(sim_outcome)
-            policy.update(context_bucket, choice.arm, reward)
+            policy.update(merchant_id or "merch_demo01", context_bucket, choice.arm, reward)
             if sim_outcome.result == "recovered":
                 recovered_count += 1
                 amount_recovered_total += sim_outcome.amount_recovered
@@ -133,7 +133,7 @@ def run_batch(
         else:
             gate_blocked_count += 1
             reward = reward_service.REWARD_BLOCKED_BY_POLICY
-            policy.update(context_bucket, choice.arm, reward)
+            policy.update(merchant_id or "merch_demo01", context_bucket, choice.arm, reward)
             sim_outcome = None
 
         if sim_outcome is None or sim_outcome.result == "not_recovered":

@@ -7,9 +7,9 @@ logger = structlog.get_logger(__name__)
 
 class BanditPolicy(Protocol):
     """Structural interface shared by the real bandit and the baseline policy."""
-    def sample_arm(self, context_bucket: str) -> "ArmChoice": ...
-    def update(self, context_bucket: str, arm: str, reward: float) -> None: ...
-    def get_stats(self, context_bucket: str) -> dict[str, tuple[float, float]]: ...
+    def sample_arm(self, merchant_id: str, context_bucket: str) -> "ArmChoice": ...
+    def update(self, merchant_id: str, context_bucket: str, arm: str, reward: float) -> None: ...
+    def get_stats(self, merchant_id: str, context_bucket: str) -> dict[str, tuple[float, float]]: ...
 
 @dataclass(frozen=True)
 class ArmChoice:
@@ -17,6 +17,8 @@ class ArmChoice:
     sampled_score: float
     alpha_at_decision: float
     beta_at_decision: float
+    confidence_level: str
+    variance_at_decision: float
 
 ARMS = [
     "retry_immediate", "retry_short_delay", "retry_long_delay",
@@ -83,20 +85,23 @@ class ThompsonSamplingBandit:
     def __init__(self, store):
         self.store = store
 
-    def sample_arm(self, context_bucket: str) -> ArmChoice:
+    def sample_arm(self, merchant_id: str, context_bucket: str) -> ArmChoice:
         best: Optional[ArmChoice] = None
         stats_snapshot = {}
 
         for arm in ARMS:
-            alpha, beta = self.store.get_stats(context_bucket, arm)
+            alpha, beta = self.store.get_stats(merchant_id, context_bucket, arm)
             stats_snapshot[arm] = (alpha, beta)
             score = float(np.random.beta(alpha, beta))
             if best is None or score > best.sampled_score:
+                from services.decide.uncertainty import beta_variance, beta_confidence_level
                 best = ArmChoice(
                     arm=arm,
                     sampled_score=score,
                     alpha_at_decision=alpha,
                     beta_at_decision=beta,
+                    confidence_level=beta_confidence_level(alpha, beta),
+                    variance_at_decision=beta_variance(alpha, beta),
                 )
 
         assert best is not None
@@ -111,7 +116,7 @@ class ThompsonSamplingBandit:
 
         return best
 
-    def update(self, context_bucket: str, arm: str, reward: float) -> None:
+    def update(self, merchant_id: str, context_bucket: str, arm: str, reward: float) -> None:
         if not (0.0 <= reward <= 1.0 or reward == -0.1):
             raise ValueError(f"reward {reward} outside valid range; validate before calling update()")
 
@@ -119,11 +124,11 @@ class ThompsonSamplingBandit:
         failure_increment = 1.0 - success_increment if reward >= 0 else 0.0
 
         if reward == -0.1:
-            self.store.increment_beta(context_bucket, arm, 0.1)
+            self.store.increment_beta(merchant_id, context_bucket, arm, 0.1)
             return
 
-        self.store.increment_alpha(context_bucket, arm, success_increment)
-        self.store.increment_beta(context_bucket, arm, failure_increment)
+        self.store.increment_alpha(merchant_id, context_bucket, arm, success_increment)
+        self.store.increment_beta(merchant_id, context_bucket, arm, failure_increment)
 
-    def get_stats(self, context_bucket: str) -> dict[str, tuple[float, float]]:
-        return {arm: self.store.get_stats(context_bucket, arm) for arm in ARMS}
+    def get_stats(self, merchant_id: str, context_bucket: str) -> dict[str, tuple[float, float]]:
+        return {arm: self.store.get_stats(merchant_id, context_bucket, arm) for arm in ARMS}
