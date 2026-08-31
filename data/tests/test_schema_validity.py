@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from data.generator import generate_batch, insert_batch
+from data.generator import generate_batch
 from packages.db_models.database import Base, engine, SessionLocal
 from packages.db_models.models.merchant import Merchant
 from packages.db_models.models.customer import Customer
