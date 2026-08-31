@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from apps.api.src.dependencies import get_db_session
-from services.audit.query_service import query_audit_trail
+from services.audit.query_service import query_audit_trail, build_episode_facts
+from services.audit.narrator import AuditNarrator
 
 router = APIRouter()
+narrator = AuditNarrator()
 
 
 @router.get("/audit-trail")
@@ -25,3 +27,12 @@ def audit_trail(
         page=page,
         page_size=page_size,
     )
+
+@router.get("/audit-trail/{episode_id}/narrative")
+def episode_narrative(episode_id: str, db_session=Depends(get_db_session)):
+    try:
+        facts = build_episode_facts(db_session, episode_id)
+        narrative = narrator.narrate(facts)
+        return {"episode_id": episode_id, "narrative": narrative.text, "method": narrative.method}
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Episode not found")
