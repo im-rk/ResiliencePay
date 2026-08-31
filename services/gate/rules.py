@@ -25,7 +25,13 @@ def check_time_window(now: datetime, allowed_hour_start: int, allowed_hour_end: 
         return ("blocked", "outside_communication_window")
     return "pass"
 
+def check_uncertainty_escalation(choice, amount: int, high_stakes_threshold_paise: int = 500_000) -> RuleResult:
+    """Not a compliance rule in the legal sense — a risk-management rule."""
+    if getattr(choice, 'confidence_level', 'high') == "low" and amount >= high_stakes_threshold_paise:
+        return ("blocked", "escalated_low_confidence_high_stakes")
+    return "pass"
+
 # Explicit, documented order — opt-out is checked first regardless of
 # performance considerations, because it's the highest-priority signal.
 # See section 2.2 for the rationale.
-RULE_CHAIN = [check_opt_out, check_max_attempts, check_cool_off, check_time_window]
+RULE_CHAIN = [check_opt_out, check_max_attempts, check_cool_off, check_time_window, check_uncertainty_escalation]

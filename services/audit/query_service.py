@@ -1,5 +1,35 @@
 from uuid import UUID
-from packages.db_models.models import AuditLog
+from packages.db_models.models import AuditLog, Episode
+from packages.db_models.models.action import Action
+
+def build_episode_facts(db_session, episode_id: str | UUID) -> dict:
+    if isinstance(episode_id, str):
+        episode_id = UUID(episode_id)
+    
+    ep = db_session.query(Episode).filter_by(episode_id=episode_id).first()
+    if not ep:
+        raise ValueError("Episode not found")
+        
+    logs = db_session.query(AuditLog).filter_by(episode_id=episode_id).order_by(AuditLog.recorded_at.asc()).all()
+    actions = db_session.query(Action).filter_by(episode_id=episode_id).order_by(Action.created_at.asc()).all()
+    
+    actions_taken = [f"{a.action_type} (status: {a.status})" for a in actions]
+    blocked_actions = [f"{l.chosen_arm} blocked due to {l.gate_result}" for l in logs if l.gate_result != "pass"]
+    
+    time_to_res = "ongoing"
+    if ep.closed_at:
+        delta = ep.closed_at - ep.opened_at
+        time_to_res = f"{delta.total_seconds() / 3600:.1f} hours"
+
+    return {
+        "cause_category": ep.episode_type,
+        "amount_rupees": ep.original_amount / 100.0,
+        "attempt_count": ep.attempt_count,
+        "actions_taken": ", ".join(actions_taken) if actions_taken else "None",
+        "blocked_actions": ", ".join(blocked_actions) if blocked_actions else "None",
+        "final_outcome": ep.status,
+        "time_to_resolution": time_to_res,
+    }
 
 
 def query_audit_trail(

@@ -1,8 +1,9 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
 from packages.config.settings import settings
-from .rules import check_cool_off, check_max_attempts, check_opt_out, check_time_window
+from .rules import check_cool_off, check_max_attempts, check_opt_out, check_time_window, check_uncertainty_escalation
 from .persistence import record_gate_check
 
 @dataclass(frozen=True)
@@ -10,6 +11,7 @@ class GateContext:
     decision_id: str
     customer_id: str
     episode: "Episode"
+    choice: "ArmChoice" | None = None
 
 @dataclass(frozen=True)
 class GateResult:
@@ -46,6 +48,13 @@ def evaluate_gate(context: "GateContext", db_session, now: datetime | None = Non
         res = GateResult(passed=False, rule_triggered=result[1])
         record_gate_check(db_session, context.decision_id, res)
         return res
+
+    if context.choice:
+        result = check_uncertainty_escalation(context.choice, context.episode.original_amount)
+        if result != "pass":
+            res = GateResult(passed=False, rule_triggered=result[1])
+            record_gate_check(db_session, context.decision_id, res)
+            return res
 
     res = GateResult(passed=True, rule_triggered=None)
     record_gate_check(db_session, context.decision_id, res)
