@@ -100,7 +100,7 @@ def run_batch_with_injected_faults(events):
             "action": action
         })
         
-        bandit.update("test_bucket", decision.chosen_arm, reward=1.0)
+        bandit.update("test_merchant", "test_bucket", decision.chosen_arm, reward=1.0)
 
     # Return structure matching what test expects
     return results, bandit, audit_log, db
@@ -129,7 +129,7 @@ def test_pipeline_survives_15pct_fault_rate():
 
     # 3. Bandit state remains internally consistent
     # Since we did 200 updates, bandit alpha should be 1 + 200 = 201
-    alpha, beta = bandit.store.get_stats("test_bucket", "retry_immediate")
+    alpha, beta = bandit.store.get_stats("test_merchant", "test_bucket", "retry_immediate")
     assert alpha == 201.0
     
     # Cleanup
