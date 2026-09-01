@@ -1,0 +1,36 @@
+[project]
+name = "resiliencepay"
+version = "0.1.0"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.1",
+    "sqlalchemy>=2.0.30",
+    "alembic>=1.13.1",
+    "psycopg2-binary>=2.9.9",
+    "celery>=5.4.0",
+    "redis>=5.0.4",
+    "razorpay>=1.4.1",
+    "anthropic>=0.28.0",
+    "structlog>=24.2.0",
+    "python-dotenv>=1.0.1",
+    "pydantic-settings>=2.2.1"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.2",
+    "pytest-cov",
+    "import-linter"
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=services --cov-fail-under=75"
+
+[tool.importlinter]
+root_packages = ["services", "apps", "packages"]
+
+[[tool.importlinter.contracts]]
+name = "services must not depend on apps"
+type = "forbidden"
+source_modules = ["services"]
+forbidden_modules = ["apps"]

@@ -1,4 +1,4 @@
-import os
+from packages.config.settings import settings
 import anthropic
 from dataclasses import dataclass
 
@@ -33,7 +33,7 @@ TEMPLATE_FALLBACK = (
 
 class AuditNarrator:
     def __init__(self, timeout_seconds: float = 5.0):
-        self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", "dummy_key"))
+        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.timeout_seconds = timeout_seconds
 
     def narrate(self, episode_facts: dict) -> EpisodeNarrative:
