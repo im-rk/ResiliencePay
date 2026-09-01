@@ -15,7 +15,23 @@ ARM_DELAYS = {
 def now():
     return datetime.now(timezone.utc)
 
-def execute_action(decision, gate_result, razorpay_client, nudge_generator, audit_log_service, db) -> Action:
+def derive_bank_segment(decision) -> str:
+    # Use payment_method if available (e.g., 'card_HDFC' -> 'HDFC'), otherwise use gateway error code
+    event = getattr(decision, "event", None)
+    if not event:
+        return "default"
+        
+    payment_method = getattr(event, "payment_method", None)
+    if payment_method and "_" in payment_method:
+        return payment_method.split("_")[-1]
+        
+    error_code = getattr(event, "gateway_error_code", None)
+    if error_code:
+        return error_code
+        
+    return "default"
+
+def execute_action(decision, gate_result, razorpay_client, nudge_generator, audit_log_service, db, circuit_breaker=None, schedule_delayed_action=None) -> Action:
     assert getattr(gate_result, "passed", False), "execute_action must never be called on a blocked decision"
     
     idempotency_key = f"action:{decision.decision_id}"
@@ -34,48 +50,65 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
     action = None
 
     if decision.chosen_arm in REAL_MONEY_ARMS:
-        try:
-            # Assuming decision.episode is available or decision.event.episode
-            episode = getattr(decision, "episode", None) or getattr(decision.event, "episode", decision.event)
-            
-            result = razorpay_client.create_retry_payment_link(episode, idempotency_key)
+        segment = derive_bank_segment(decision)
+        if circuit_breaker and not circuit_breaker.should_allow_attempt(segment):
             action = Action(
                 decision_id=decision.decision_id, 
                 arm_name=decision.chosen_arm,
                 simulated=False, 
-                razorpay_ref_id=result.id, 
-                status="executed",
+                status="deferred_circuit_open",
                 executed_at=now()
             )
-            logger.info("action_executed", **log_context, simulated=False, status="executed", razorpay_ref_id=result.id)
-        except RazorpayPermanentError as e:
-            action = Action(
-                decision_id=decision.decision_id, 
-                arm_name=decision.chosen_arm,
-                simulated=False, 
-                status="failed",
-                executed_at=now()
-            )
-            audit_log_service.write_error(decision, code="RAZORPAY_PERMANENT_ERROR", reason=str(e))
-            logger.info("action_failed", **log_context, simulated=False, status="failed", error="RAZORPAY_PERMANENT_ERROR")
-        except RazorpayTransientError as e:
-            action = Action(
-                decision_id=decision.decision_id, 
-                arm_name=decision.chosen_arm,
-                simulated=False, 
-                status="failed",
-                executed_at=now()
-            )
-            audit_log_service.write_error(decision, code="RAZORPAY_RETRIES_EXHAUSTED", reason=str(e))
-            logger.info("action_failed", **log_context, simulated=False, status="failed", error="RAZORPAY_RETRIES_EXHAUSTED")
+            audit_log_service.write_note(decision, note=f"circuit_open_for_segment:{segment}")
+            logger.info("action_deferred", **log_context, simulated=False, status="deferred_circuit_open", segment=segment)
+        else:
+            try:
+                # Assuming decision.episode is available or decision.event.episode
+                episode = getattr(decision, "episode", None) or getattr(decision.event, "episode", decision.event)
+                
+                result = razorpay_client.create_retry_payment_link(episode, idempotency_key)
+                if circuit_breaker:
+                    circuit_breaker.record_result(segment, succeeded=True)
+                
+                action = Action(
+                    decision_id=decision.decision_id, 
+                    arm_name=decision.chosen_arm,
+                    simulated=False, 
+                    razorpay_ref_id=result.id, 
+                    status="executed",
+                    executed_at=now()
+                )
+                logger.info("action_executed", **log_context, simulated=False, status="executed", razorpay_ref_id=result.id)
+            except RazorpayPermanentError as e:
+                if circuit_breaker:
+                    circuit_breaker.record_result(segment, succeeded=False)
+                action = Action(
+                    decision_id=decision.decision_id, 
+                    arm_name=decision.chosen_arm,
+                    simulated=False, 
+                    status="failed",
+                    executed_at=now()
+                )
+                audit_log_service.write_error(decision, code="RAZORPAY_PERMANENT_ERROR", reason=str(e))
+                logger.info("action_failed", **log_context, simulated=False, status="failed", error="RAZORPAY_PERMANENT_ERROR")
+            except RazorpayTransientError as e:
+                if circuit_breaker:
+                    circuit_breaker.record_result(segment, succeeded=False)
+                action = Action(
+                    decision_id=decision.decision_id, 
+                    arm_name=decision.chosen_arm,
+                    simulated=False, 
+                    status="failed",
+                    executed_at=now()
+                )
+                audit_log_service.write_error(decision, code="RAZORPAY_RETRIES_EXHAUSTED", reason=str(e))
+                logger.info("action_failed", **log_context, simulated=False, status="failed", error="RAZORPAY_RETRIES_EXHAUSTED")
 
     elif decision.chosen_arm in DELAYED_ARMS:
         eta = now() + ARM_DELAYS[decision.chosen_arm]
         
-        # We must import this dynamically to avoid circular imports during tests,
-        # or we assume it's available via an import.
-        from apps.worker.src.tasks.execute_delayed_action import execute_delayed_action_task
-        execute_delayed_action_task.apply_async(args=[str(decision.decision_id)], eta=eta)
+        if schedule_delayed_action:
+            schedule_delayed_action(str(decision.decision_id), eta)
         
         action = Action(
             decision_id=decision.decision_id, 

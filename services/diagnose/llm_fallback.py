@@ -1,10 +1,10 @@
-import os
 import anthropic
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 from services.diagnose.schemas import DiagnosisResult
+from packages.config.settings import settings
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", "dummy_key"))
+client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
 def get_fallback_result() -> DiagnosisResult:
     return DiagnosisResult(
