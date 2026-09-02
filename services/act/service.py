@@ -52,15 +52,20 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
     if decision.chosen_arm in REAL_MONEY_ARMS:
         segment = derive_bank_segment(decision)
         if circuit_breaker and not circuit_breaker.should_allow_attempt(segment):
+            eta = now() + timedelta(minutes=45)
+            if schedule_delayed_action:
+                schedule_delayed_action(str(decision.decision_id), eta)
+                
             action = Action(
                 decision_id=decision.decision_id, 
                 arm_name=decision.chosen_arm,
                 simulated=False, 
+                scheduled_for=eta,
                 status="deferred_circuit_open",
                 executed_at=now()
             )
             audit_log_service.write_note(decision, note=f"circuit_open_for_segment:{segment}")
-            logger.info("action_deferred", **log_context, simulated=False, status="deferred_circuit_open", segment=segment)
+            logger.info("action_deferred", **log_context, simulated=False, status="deferred_circuit_open", segment=segment, eta=eta.isoformat())
         else:
             try:
                 # Assuming decision.episode is available or decision.event.episode

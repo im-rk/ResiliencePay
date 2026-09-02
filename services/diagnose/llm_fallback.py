@@ -1,10 +1,18 @@
-import anthropic
+import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 from services.diagnose.schemas import DiagnosisResult
+from pydantic import BaseModel, ValidationError, Field
 from packages.config.settings import settings
+import json
 
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+class LLMOutputSchema(BaseModel):
+    cause_category: CauseCategoryEnum
+    confidence: float = Field(ge=0.0, le=1.0)
+    justification: str
+
+genai.configure(api_key=settings.gemini_api_key)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 def get_fallback_result() -> DiagnosisResult:
     return DiagnosisResult(
@@ -17,64 +25,31 @@ def get_fallback_result() -> DiagnosisResult:
 @retry(
     stop=stop_after_attempt(3), # 1 initial + 2 retries
     wait=wait_exponential(multiplier=1, min=1, max=4),
-    retry=retry_if_exception_type((anthropic.APIConnectionError, anthropic.APITimeoutError, anthropic.InternalServerError, ValueError))
+    retry=retry_if_exception_type((Exception,))
 )
 def _call_llm(raw_message: str) -> DiagnosisResult:
-    tools = [
-        {
-            "name": "provide_diagnosis",
-            "description": "Provide a diagnosis for the payment failure.",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "cause_category": {
-                        "type": "string",
-                        "enum": [e.value for e in CauseCategoryEnum if e != CauseCategoryEnum.UNKNOWN],
-                        "description": "The category of the failure."
-                    },
-                    "confidence": {
-                        "type": "number",
-                        "description": "Confidence score from 0.0 to 1.0."
-                    },
-                    "justification": {
-                        "type": "string",
-                        "description": "A brief explanation of why this category was chosen."
-                    }
-                },
-                "required": ["cause_category", "confidence", "justification"]
-            }
-        }
-    ]
-
-    response = client.messages.create(
-        model="claude-3-haiku-20240307",
-        max_tokens=200,
-        timeout=5.0, # 5s timeout as requested
-        tools=tools,
-        tool_choice={"type": "tool", "name": "provide_diagnosis"},
-        messages=[
-            {
-                "role": "user",
-                "content": f"Classify this raw payment gateway error message:\n\n{raw_message}"
-            }
-        ]
+    prompt = f"Classify this raw payment gateway error message:\n\n{raw_message}"
+    
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            response_schema=LLMOutputSchema,
+        )
     )
-
-    for content in response.content:
-        if content.type == "tool_use" and content.name == "provide_diagnosis":
-            args = content.input
-            try:
-                return DiagnosisResult(
-                    cause_category=CauseCategoryEnum(args["cause_category"]),
-                    confidence=float(args["confidence"]),
-                    method="llm_fallback",
-                    justification=args["justification"],
-                    model_version="claude-3-haiku-20240307"
-                )
-            except (KeyError, ValueError) as e:
-                raise ValueError(f"Malformed LLM output: {e}")
-                
-    raise ValueError("LLM did not return a valid tool call.")
+    
+    try:
+        # Strict Pydantic Validation on LLM Diagnostics
+        parsed = LLMOutputSchema.model_validate_json(response.text)
+        return DiagnosisResult(
+            cause_category=parsed.cause_category,
+            confidence=parsed.confidence,
+            method="llm_fallback",
+            justification=parsed.justification,
+            model_version="gemini-1.5-flash"
+        )
+    except ValidationError as e:
+        raise ValueError(f"Malformed LLM output: {e}")
 
 def classify(raw_message: str) -> DiagnosisResult:
     """

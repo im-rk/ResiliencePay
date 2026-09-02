@@ -13,7 +13,8 @@ dependencies = [
     "anthropic>=0.28.0",
     "structlog>=24.2.0",
     "python-dotenv>=1.0.1",
-    "pydantic-settings>=2.2.1"
+    "pydantic-settings>=2.2.1",
+    "google-generativeai>=0.7.2"
 ]
 
 [project.optional-dependencies]

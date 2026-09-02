@@ -183,3 +183,24 @@ def run_batch(
     )
 
     return run
+
+if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+    from packages.db_models.database import get_db
+    from services.decide.bandit import ThompsonSamplingBandit
+    from services.decide.redis_store import RedisArmStatsStore
+    from packages.config.redis_client import redis_client
+
+    db_gen = get_db()
+    db = next(db_gen)
+    
+    from services.decide.bandit import ARMS
+    default_priors = {arm: (1.0, 2.0) for arm in ARMS}
+    store = RedisArmStatsStore(redis_client, default_priors)
+    bandit = ThompsonSamplingBandit(store)
+    
+    print("Starting batch simulation...")
+    run_batch(db, 42, 300, "ThompsonSampling", bandit)
+    print("Batch simulation completed.")

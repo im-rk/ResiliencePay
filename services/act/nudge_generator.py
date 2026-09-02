@@ -14,17 +14,23 @@ TEMPLATE_FALLBACKS = {
     "send_card_update_link": "Your card on file needs updating. Update it here: {link}",
 }
 
+import google.generativeai as genai
+from packages.config.settings import settings
+
+genai.configure(api_key=settings.gemini_api_key)
+model = genai.GenerativeModel("gemini-1.5-flash")
+
 class NudgeGenerator:
-    def __init__(self, llm_client, timeout_seconds: float = 5.0):
-        self.llm_client = llm_client
+    def __init__(self, timeout_seconds: float = 5.0):
         self.timeout_seconds = timeout_seconds
 
     def generate(self, decision, language: str) -> NudgeResult:
         prompt = self._build_prompt(decision, language)
         try:
             from services.act.fault_injection import with_fault_injection
-            injected_complete = with_fault_injection(self.llm_client.complete)
-            text = injected_complete(prompt, timeout=self.timeout_seconds)
+            # wrap the call for fault injection testing
+            injected_complete = with_fault_injection(lambda p, t: model.generate_content(p).text)
+            text = injected_complete(prompt, self.timeout_seconds)
             return NudgeResult(text=text, method="llm_generated")
         except Exception as e:  # noqa: BLE001 — deliberately broad: ANY LLM failure must fall back, never propagate
             logger.warning("nudge_generation_failed_falling_back", extra={
