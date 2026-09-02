@@ -31,6 +31,13 @@ def evaluate_gate(context: "GateContext", db_session, now: datetime | None = Non
         record_gate_check(db_session, context.decision_id, res)
         return res
 
+    from .rules import check_active_promise_to_pay
+    result = check_active_promise_to_pay(context.episode, db_session, now)
+    if result != "pass":
+        res = GateResult(passed=False, rule_triggered=result[1])
+        record_gate_check(db_session, context.decision_id, res)
+        return res
+
     result = check_max_attempts(context.episode, settings.gate_max_attempts)
     if result != "pass":
         res = GateResult(passed=False, rule_triggered=result[1])

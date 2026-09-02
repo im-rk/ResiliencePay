@@ -60,6 +60,27 @@ class RazorpayClient:
             idempotency_key=f"fetch:{payment_id}",
         )
 
+    def find_payment_link_by_idempotency_key(self, idempotency_key: str) -> PaymentLinkResult | None:
+        """
+        Since Razorpay does not natively index by idempotency_key in their fetch API,
+        we scan recent links. In a production system, this could be optimized by 
+        searching within a time-window.
+        """
+        return self._call_with_retry(
+            lambda: self._search_links_for_idempotency_key(idempotency_key),
+            result_mapper=lambda r: r,
+            idempotency_key=f"search:{idempotency_key}",
+        )
+
+    def _search_links_for_idempotency_key(self, idempotency_key: str) -> PaymentLinkResult | None:
+        response = self._client.payment_link.all({"count": 100})
+        links = response.get("items", [])
+        for link in links:
+            notes = link.get("notes", {})
+            if isinstance(notes, dict) and notes.get("idempotency_key") == idempotency_key:
+                return PaymentLinkResult(id=link["id"], short_url=link.get("short_url", ""), status=link.get("status", ""))
+        return None
+
     def _call_with_retry(self, fn, result_mapper, idempotency_key: str):
         from services.act.fault_injection import with_fault_injection
         injected_fn = with_fault_injection(fn)

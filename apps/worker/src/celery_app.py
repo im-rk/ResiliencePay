@@ -17,4 +17,12 @@ app.conf.beat_schedule = {
         'task': 'reconcile_payment_status',
         'schedule': crontab(minute=0),
     },
+    'reconcile-pending-actions-every-5-mins': {
+        'task': 'reconcile_pending_actions',
+        'schedule': crontab(minute='*/5'),
+    },
+    'check-promise-to-pay-deadlines-daily': {
+        'task': 'check_promise_to_pay_deadlines',
+        'schedule': crontab(hour=0, minute=0),
+    }
 }
