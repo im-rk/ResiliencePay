@@ -6,7 +6,7 @@ import os
 
 from apps.api.src.middleware.error_handler import register_error_handlers
 from apps.api.src.middleware.request_id import RequestIDMiddleware
-from apps.api.src.routers import events, batch, metrics, audit, admin
+from apps.api.src.routers import events, batch, metrics, audit, admin, simulations, webhooks
 
 SECRET_PATTERNS = [re.compile(r"(key_secret|api_key|password|ADMIN_SECRET)=\S+", re.IGNORECASE)]
 
@@ -55,6 +55,8 @@ app.include_router(batch.router, prefix="/v1", tags=["batch"])
 app.include_router(metrics.router, prefix="/v1", tags=["metrics"])
 app.include_router(audit.router, prefix="/v1", tags=["audit"])
 app.include_router(admin.router, prefix="/v1", tags=["admin"])
+app.include_router(simulations.router, prefix="/v1/simulations", tags=["simulations"])
+app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
 
 
 @app.get("/healthz")
