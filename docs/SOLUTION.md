@@ -17,6 +17,10 @@ Stripped of hackathon language, this is a **dunning-management system** — the 
 ResiliencePay is an end-to-end, production-grade revenue recovery engine. It operates through a continuous, closed loop:
 1. **Ingest & Diagnose:** Captures failed-payment events and classifies the root cause against a standardized taxonomy (with a generative LLM fallback for unknown errors).
 2. **Decide:** Selects the optimal recovery action using a contextual bandit (Thompson Sampling) that continuously learns and improves from real observed outcomes.
+   * **Explicit Context Features Evaluated:**
+     * **Transaction amount tier:** Micro (<₹500), Standard (₹500–₹5,000), High (>₹5,000).
+     * **Time-of-day / Day-of-week buckets:** Specifically avoiding Indian core banking maintenance windows between 11:30 PM and 1:30 AM IST.
+     * **Payment instrument:** UPI Autopay, e-Mandate, Debit Card, Credit Card.
 3. **Gate (Compliance):** Passes the chosen action through an independent, deterministic compliance gate that no learning system can override.
 4. **Act & Observe:** Executes the action idempotently (a real Razorpay test-mode API call or a simulated customer nudge), observes the financial outcome, feeds the reward back to the bandit, and records every step in an immutable, DB-enforced audit log.
 

@@ -1,53 +1,61 @@
-import React, { useState } from "react";
-import { usePolling } from "../hooks/usePolling";
-import { fetchAuditTrail } from "../api/client";
-import { formatTime } from "../lib/format";
+import React from "react";
 
-function PanelSkeleton({ label }: { label: string }) {
-  return <div className="panel-skeleton">{label}</div>;
+interface AuditTrailTableProps {
+  events: any[];
 }
 
-function PanelError({ message }: { message: string }) {
-  return <div className="panel-error">{message}</div>;
-}
-
-function AuditFilterBar({ filters, onChange }: { filters: any, onChange: (f: any) => void }) {
-  return (
-    <div className="filter-bar">
-      {/* Simple stub for filters */}
-      <span>Filters: None</span>
-    </div>
-  );
-}
-
-export function AuditTrailTable() {
-  const [filters, setFilters] = useState<any>({});
-  const { data, isLoading, isError } = usePolling(["audit-trail", filters], () => fetchAuditTrail(filters), 10000);
-
+export function AuditTrailTable({ events }: AuditTrailTableProps) {
   return (
     <div className="audit-trail">
-      <AuditFilterBar filters={filters} onChange={setFilters} />
-      {isLoading && <PanelSkeleton label="Loading audit trail…" />}
-      {isError && <PanelError message="Could not load audit trail." />}
-      {data && data.entries && data.entries.length === 0 && (
-        <div className="empty-audit">No matching audit entries</div>
-      )}
-      {data && data.entries && data.entries.length > 0 && (
-        <table>
+      {events.length === 0 ? (
+        <div style={{ color: 'var(--color-text-secondary)' }}>No audit entries available. Start a simulation run.</div>
+      ) : (
+        <table style={{ width: '100%', textAlign: 'left', fontSize: '13px' }}>
           <thead>
-            <tr><th>Time</th><th>Cause</th><th>Arm</th><th>Gate</th><th>Simulated</th><th>Outcome</th></tr>
+            <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Event ID</th>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Cause Category</th>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Bandit Arm</th>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Gate Verdict</th>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Execution Status</th>
+              <th style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>Reason / Audit Note</th>
+            </tr>
           </thead>
           <tbody>
-            {data.entries.map((row: any) => (
-              <tr key={row.audit_id} className={row.gate_result === false ? "row-blocked" : ""}>
-                <td>{formatTime(row.recorded_at)}</td>
-                <td>{row.cause_category ?? "—"}</td>
-                <td>{row.chosen_arm ?? "—"}</td>
-                <td>{row.gate_result === false ? "Blocked" : "Passed"}</td>
-                <td>{row.simulated === true ? "Simulated" : row.simulated === false ? "Real" : "Unknown"}</td>
-                <td>{row.outcome_result ?? "pending"}</td>
-              </tr>
-            ))}
+            {events.map((row: any, idx: number) => {
+              const eventId = row.event_id ? row.event_id.split("-")[0] : "EVT_UNKNOWN";
+              
+              let gateVerdict = "N/A";
+              if (row.gate_result === "passed") gateVerdict = "PASSED";
+              if (row.gate_result === "blocked") gateVerdict = "BLOCKED";
+              
+              let execStatus = "PENDING";
+              if (row.outcome_result === "recovered") execStatus = "RECOVERED";
+              if (row.outcome_result === "failed") execStatus = "FAILED";
+              if (gateVerdict === "BLOCKED") execStatus = "HALTED";
+              if (row.chosen_arm === "DEFER_RETRY") execStatus = "QUEUED";
+              if (row.chosen_arm === "WHATSAPP_NUDGE" || row.chosen_arm === "SMS_NUDGE") execStatus = "DISPATCHED";
+              
+              let auditNote = "";
+              if (execStatus === "RECOVERED") auditNote = "Customer completed via link";
+              else if (execStatus === "HALTED") auditNote = "Blocked by strict rule";
+              else if (execStatus === "QUEUED") auditNote = "Systemic cool-off applied";
+              else if (execStatus === "DISPATCHED") auditNote = "Sent communication";
+              else auditNote = row.error_code || "Processed";
+
+              return (
+                <tr key={`${row.event_id}-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '8px', fontFamily: 'monospace' }}>{eventId}</td>
+                  <td style={{ padding: '8px' }}>{row.cause_category ?? "—"}</td>
+                  <td style={{ padding: '8px' }}>{row.chosen_arm ?? "—"}</td>
+                  <td style={{ padding: '8px', fontWeight: 'bold' }} className={gateVerdict === "PASSED" ? "text-success" : (gateVerdict === "BLOCKED" ? "text-danger" : "")}>
+                    {gateVerdict}
+                  </td>
+                  <td style={{ padding: '8px' }}>{execStatus}</td>
+                  <td style={{ padding: '8px', color: 'var(--color-text-secondary)' }}>{auditNote}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

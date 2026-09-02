@@ -3,7 +3,7 @@ import { usePolling } from "../hooks/usePolling";
 import { fetchExceptions } from "../api/client";
 
 function PanelSkeleton({ label }: { label: string }) {
-  return <div className="panel-skeleton">{label}</div>;
+  return <div className="skeleton" style={{ padding: '2rem' }}>{label}</div>;
 }
 
 function PanelError({ message }: { message: string }) {
