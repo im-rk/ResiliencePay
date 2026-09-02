@@ -10,6 +10,20 @@ def check_opt_out(customer_id, db_session) -> RuleResult:
     exists = db_session.query(OptOut).filter_by(customer_id=customer_id).first() is not None
     return ("blocked", "customer_opted_out") if exists else "pass"
 
+def check_active_promise_to_pay(episode, db_session, now: datetime) -> RuleResult:
+    """Added to RULE_CHAIN — see PHASE_04_gate_DETAILED.md's rule ordering.
+    Placed after opt-out (still the highest priority) but before
+    operational rules like max_attempts, since an active promise is a
+    customer commitment that should suppress automated action regardless
+    of retry count."""
+    from services.gate.persistence import get_active_promise
+    from datetime import timedelta
+    
+    ptp = get_active_promise(db_session, episode.episode_id)
+    if ptp and now.date() <= (ptp.promised_date + timedelta(days=1)):
+        return ("blocked", "active_promise_to_pay")
+    return "pass"
+
 def check_max_attempts(episode, max_attempts: int) -> RuleResult:
     if episode.attempt_count >= max_attempts:
         return ("blocked", "max_attempts_exceeded")
@@ -34,4 +48,4 @@ def check_uncertainty_escalation(choice, amount: int, high_stakes_threshold_pais
 # Explicit, documented order — opt-out is checked first regardless of
 # performance considerations, because it's the highest-priority signal.
 # See section 2.2 for the rationale.
-RULE_CHAIN = [check_opt_out, check_max_attempts, check_cool_off, check_time_window, check_uncertainty_escalation]
+RULE_CHAIN = [check_opt_out, check_active_promise_to_pay, check_max_attempts, check_cool_off, check_time_window, check_uncertainty_escalation]

@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime, timezone
 from packages.db_models.models.action import Action
+from packages.db_models.models.pending_action import PendingAction
 from services.act.razorpay_client import RazorpayPermanentError, RazorpayTransientError
 
 REAL_MONEY_ARMS = {"retry_immediate"}
@@ -68,10 +69,25 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
             logger.info("action_deferred", **log_context, simulated=False, status="deferred_circuit_open", segment=segment, eta=eta.isoformat())
         else:
             try:
+                # Step 1 — durable intent record, committed BEFORE the external call.
+                pending = PendingAction(
+                    decision_id=decision.decision_id,
+                    idempotency_key=idempotency_key, 
+                    status="attempting"
+                )
+                db.add(pending)
+                db.commit()  # deliberately a separate, immediate commit
+
                 # Assuming decision.episode is available or decision.event.episode
                 episode = getattr(decision, "episode", None) or getattr(decision.event, "episode", decision.event)
                 
                 result = razorpay_client.create_retry_payment_link(episode, idempotency_key)
+                
+                pending.status = "confirmed"
+                pending.razorpay_ref_id = result.id
+                pending.resolved_at = now()
+                db.commit()
+
                 if circuit_breaker:
                     circuit_breaker.record_result(segment, succeeded=True)
                 
@@ -85,6 +101,9 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
                 )
                 logger.info("action_executed", **log_context, simulated=False, status="executed", razorpay_ref_id=result.id)
             except RazorpayPermanentError as e:
+                pending.status = "failed"
+                pending.resolved_at = now()
+                db.commit()
                 if circuit_breaker:
                     circuit_breaker.record_result(segment, succeeded=False)
                 action = Action(
@@ -97,6 +116,9 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
                 audit_log_service.write_error(decision, code="RAZORPAY_PERMANENT_ERROR", reason=str(e))
                 logger.info("action_failed", **log_context, simulated=False, status="failed", error="RAZORPAY_PERMANENT_ERROR")
             except RazorpayTransientError as e:
+                pending.status = "failed"
+                pending.resolved_at = now()
+                db.commit()
                 if circuit_breaker:
                     circuit_breaker.record_result(segment, succeeded=False)
                 action = Action(

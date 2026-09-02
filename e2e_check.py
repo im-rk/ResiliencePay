@@ -3,12 +3,14 @@ from datetime import datetime, timezone
 from data.generator import generate_batch
 from services.diagnose.service import diagnose
 from packages.db_models.models.merchant import Merchant
+from packages.db_models.database import SessionLocal
 from packages.db_models.models.event import Event
 from packages.db_models.models.episode import Episode
 from packages.db_models.models.customer import Customer
 
 def run_e2e():
     print("--- 1. Testing Phase 1 (Data Models) ---")
+    db_session = SessionLocal()
     try:
         merchant_id = uuid.uuid4()
         merchant = Merchant(merchant_id=merchant_id, name="E2E Test Merchant", razorpay_key_id="rzp_test_e2e", vertical="ecommerce")
@@ -30,14 +32,14 @@ def run_e2e():
                 event_id=uuid.uuid4(),
                 episode_id=uuid.uuid4(),
                 gateway_error_code=draft["gateway_error_code"],
-                occurred_at=draft["occurred_at"],
-                raw_payload={"_ground_truth_recoverable": draft["_ground_truth_recoverable"]}
+                raw_payload={"_ground_truth_recoverable_prob": draft.get("_ground_truth_recoverable_prob", draft.get("_ground_truth_recoverable", 0.5))},
+                occurred_at=draft["occurred_at"]
             )
             events.append(event)
             
         print("Running diagnosis orchestrator over the generated events...")
         for event in events:
-            diagnosis = diagnose(event)
+            diagnosis = diagnose(event, db_session)
             results[diagnosis.method] += 1
             
         print("\nDiagnosis Results Summary (for 50 events):")
@@ -56,7 +58,7 @@ def run_e2e():
             raw_payload={"raw_gateway_message": "User tried to pay with a blocked test card."}
         )
         print("Invoking fallback for raw message: 'User tried to pay with a blocked test card.'")
-        fallback_diagnosis = diagnose(unknown_event)
+        fallback_diagnosis = diagnose(unknown_event, db_session)
         print(f"LLM Fallback Diagnosis: Category='{fallback_diagnosis.cause_category.value}', Confidence={fallback_diagnosis.confidence}")
         
         print("\n🚀 All phases (1, 2, 3) integrated perfectly end-to-end!")
@@ -65,6 +67,8 @@ def run_e2e():
         print(f"\nE2E Check Failed: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        db_session.close()
 
 if __name__ == "__main__":
     run_e2e()

@@ -11,3 +11,7 @@ from packages.db_models.models.bandit_arm_stats import BanditArmStats
 from packages.db_models.models.batch_run import BatchRun, BatchRunMetrics
 from packages.db_models.models.audit_log import AuditLog
 from packages.db_models.models.lookups import CauseCategory, Arm
+from packages.db_models.models.pending_action import PendingAction
+from packages.db_models.models.dead_lettered_action import DeadLetteredAction
+from packages.db_models.models.diagnosis_embedding import DiagnosisEmbedding
+from packages.db_models.models.promise_to_pay import PromiseToPay
