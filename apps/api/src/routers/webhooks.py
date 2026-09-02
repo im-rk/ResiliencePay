@@ -42,16 +42,7 @@ async def razorpay_webhook(
         logger.info("webhook_duplicate_event_id_deduped", extra={"event_id": event_id})
         return {"status": "already_processed"}
 
-    bandit = ThompsonSamplingBandit()
-    reward_service = RewardService()
-    audit_log_service = AuditLogService(db_session)
+    # Enqueue for async processing durably using Redis Streams
+    redis_client.xadd("webhook_stream", {"payload": json.dumps(payload)})
 
-    handle_payment_captured_webhook(
-        payload=payload, 
-        db_session=db_session, 
-        bandit=bandit, 
-        reward_service=reward_service, 
-        audit_log_service=audit_log_service
-    )
-    
-    return {"status": "processed"}
+    return {"status": "accepted"}
