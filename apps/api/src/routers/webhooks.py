@@ -5,10 +5,6 @@ from fastapi import APIRouter, Depends
 from apps.api.src.dependencies import get_db_session
 from apps.api.src.middleware.webhook_auth import verify_razorpay_signature
 from services.observe.webhook_lock import acquire_webhook_processing_lock
-from services.observe.webhook_handlers import handle_payment_captured_webhook
-from services.decide.bandit import ThompsonSamplingBandit
-from services.observe.reward_service import RewardService
-from services.audit.audit_log_service import AuditLogService
 from packages.config.redis_client import redis_client
 
 logger = structlog.get_logger()

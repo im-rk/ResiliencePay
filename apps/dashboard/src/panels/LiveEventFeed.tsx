@@ -1,5 +1,3 @@
-import React from "react";
-import { useSimulationStream } from "../hooks/useSimulationStream";
 
 interface LiveEventFeedProps {
   events: any[];

@@ -1,4 +1,3 @@
-import pytest
 import uuid
 from packages.config.settings import settings
 from data.generator import generate_batch
@@ -7,7 +6,6 @@ from services.act.nudge_generator import NudgeGenerator
 from services.act.service import execute_action
 from services.decide.bandit import ThompsonSamplingBandit
 from services.decide.redis_store import RedisArmStatsStore
-from services.audit.audit_log_service import AuditLogService
 
 class MockLLMClient:
     def complete(self, prompt: str, timeout: float = 5.0) -> str:

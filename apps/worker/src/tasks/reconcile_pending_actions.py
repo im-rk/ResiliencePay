@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta, datetime, timezone
 import structlog
 from celery import shared_task

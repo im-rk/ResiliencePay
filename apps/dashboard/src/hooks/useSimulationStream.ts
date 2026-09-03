@@ -6,41 +6,44 @@ export function useSimulationStream() {
   const streamRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    // Connect to the SSE endpoint
     const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/simulations/stream`;
-    const eventSource = new EventSource(url);
-    streamRef.current = eventSource;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
 
-    eventSource.onopen = () => {
-      setIsConnected(true);
-      console.log("Connected to live simulation stream");
-    };
+    const connect = () => {
+      if (stopped) return;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        // Prepend new events to the top of the feed, keeping max 300
-        setEvents((prev) => [data, ...prev].slice(0, 300));
-      } catch (err) {
-        console.error("Failed to parse SSE data", err);
-      }
-    };
+      const eventSource = new EventSource(url);
+      streamRef.current = eventSource;
 
-    eventSource.onerror = (err) => {
-      console.error("SSE connection error", err);
-      setIsConnected(false);
-      eventSource.close();
-      
-      // Auto-reconnect after 2 seconds
-      setTimeout(() => {
-        if (streamRef.current === eventSource) {
-           // Wait for next render cycle to re-establish
+      eventSource.onopen = () => {
+        setIsConnected(true);
+        console.log("Connected to live simulation stream");
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setEvents((prev) => [data, ...prev].slice(0, 300));
+        } catch (err) {
+          console.error("Failed to parse SSE data", err);
         }
-      }, 2000);
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("SSE connection error", err);
+        setIsConnected(false);
+        eventSource.close();
+        if (!stopped) reconnectTimer = setTimeout(connect, 2000);
+      };
     };
+
+    connect();
 
     return () => {
-      eventSource.close();
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      streamRef.current?.close();
       setIsConnected(false);
     };
   }, []);

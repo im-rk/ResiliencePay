@@ -1,4 +1,3 @@
-import pytest
 from eval.off_policy_evaluation import evaluate_off_policy
 
 class DummyBandit:

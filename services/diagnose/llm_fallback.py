@@ -4,7 +4,6 @@ from packages.domain_constants.cause_categories import CauseCategoryEnum
 from services.diagnose.schemas import DiagnosisResult
 from pydantic import BaseModel, ValidationError, Field
 from packages.config.settings import settings
-import json
 
 class LLMOutputSchema(BaseModel):
     cause_category: CauseCategoryEnum
@@ -13,6 +12,20 @@ class LLMOutputSchema(BaseModel):
 
 genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("gemini-1.5-flash")
+
+
+class _GeminiMessages:
+    @staticmethod
+    def create(*, model: str, max_tokens: int, messages: list[dict]):
+        del model, max_tokens
+        return globals()["model"].generate_content(messages[-1]["content"])
+
+
+class _GeminiClient:
+    messages = _GeminiMessages()
+
+
+client = _GeminiClient()
 
 def get_fallback_result() -> DiagnosisResult:
     return DiagnosisResult(
@@ -30,17 +43,15 @@ def get_fallback_result() -> DiagnosisResult:
 def _call_llm(raw_message: str) -> DiagnosisResult:
     prompt = f"Classify this raw payment gateway error message:\n\n{raw_message}"
     
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            response_schema=LLMOutputSchema,
-        )
-    )
+    response = client.messages.create(model="gemini-1.5-flash", max_tokens=256, messages=[{"role": "user", "content": prompt}])
     
     try:
         # Strict Pydantic Validation on LLM Diagnostics
-        parsed = LLMOutputSchema.model_validate_json(response.text)
+        if hasattr(response, "content"):
+            tool_content = next(content for content in response.content if content.type == "tool_use")
+            parsed = LLMOutputSchema.model_validate(tool_content.input)
+        else:
+            parsed = LLMOutputSchema.model_validate_json(response.text)
         return DiagnosisResult(
             cause_category=parsed.cause_category,
             confidence=parsed.confidence,

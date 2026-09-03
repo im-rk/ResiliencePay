@@ -1,4 +1,3 @@
-import pytest
 from services.decide.hierarchical_priors import blend_priors
 
 def test_new_merchant_relies_fully_on_global_pool():

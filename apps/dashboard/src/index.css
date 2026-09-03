@@ -196,6 +196,48 @@ tr:hover td {
   box-sizing: border-box;
 }
 
+.dashboard-container {
+  min-height: 100vh;
+  height: auto;
+  overflow: visible;
+}
+
+.dashboard-grid-dense {
+  flex: none;
+  min-height: 480px;
+  height: clamp(480px, 58vh, 680px);
+}
+
+.feed-panel, .inspector-panel, .simulator-panel {
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.audit-footer {
+  flex: none;
+  min-height: 220px;
+  overflow: hidden;
+}
+
+.audit-footer > div {
+  overflow: auto;
+}
+
+@media (max-width: 900px) {
+  .dashboard-container {
+    padding: 0 12px 16px;
+  }
+
+  .dashboard-grid-dense {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .feed-panel, .inspector-panel, .simulator-panel {
+    min-height: 360px;
+  }
+}
 .dashboard-grid-dense {
   display: grid;
   grid-template-columns: 1fr 1.5fr 1fr;

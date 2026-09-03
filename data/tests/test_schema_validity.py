@@ -3,8 +3,6 @@ import uuid
 from data.generator import generate_batch
 from packages.db_models.database import Base, engine, SessionLocal
 from packages.db_models.models.merchant import Merchant
-from packages.db_models.models.customer import Customer
-from packages.db_models.models.episode import Episode
 from packages.db_models.models.event import Event
 
 @pytest.fixture(scope="session")

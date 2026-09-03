@@ -3,7 +3,10 @@ import redis
 import structlog
 from packages.config.redis_client import redis_client
 from packages.db_models.database import SessionLocal
-from services.observe.webhook_handlers import handle_payment_captured_webhook
+from services.observe.webhook_handlers import (
+    handle_payment_captured_webhook,
+    handle_subscription_charge_failed_webhook,
+)
 from services.decide import get_bandit_policy
 from services.observe.reward_service import RewardService
 from services.audit.audit_log_service import AuditLogService
@@ -38,7 +41,12 @@ def consume_webhook_events_durable(redis_client, run_once=False):
                     try:
                         payload_bytes = fields.get(b"payload") or fields.get("payload")
                         payload = json.loads(payload_bytes)
-                        handle_payment_captured_webhook(
+                        handler = (
+                            handle_subscription_charge_failed_webhook
+                            if payload.get("event") == "subscription.charge.failed"
+                            else handle_payment_captured_webhook
+                        )
+                        handler(
                             payload, 
                             db_session, 
                             bandit, 
@@ -58,8 +66,13 @@ def consume_webhook_events_durable(redis_client, run_once=False):
         except KeyboardInterrupt:
             logger.info("stopped_webhook_stream_consumer")
             break
-        except Exception:
-            logger.exception("webhook_consumer_loop_error")
+        except redis.exceptions.ConnectionError:
+            logger.warning("redis_connection_dropped_reconnecting")
+            if run_once:
+                break
+            continue
+        except Exception as e:
+            logger.error("webhook_consumer_loop_error", error=str(e))
             if run_once:
                 break
 

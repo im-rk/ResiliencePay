@@ -1,7 +1,6 @@
-import pytest
 from unittest.mock import patch, MagicMock
 import anthropic
-from services.diagnose.llm_fallback import classify, get_fallback_result
+from services.diagnose.llm_fallback import classify
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 
 @patch("services.diagnose.llm_fallback.client.messages.create")

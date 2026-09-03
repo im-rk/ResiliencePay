@@ -1,4 +1,3 @@
-import pytest
 from collections import Counter
 from data.generator import generate_batch, CAUSE_DISTRIBUTION
 

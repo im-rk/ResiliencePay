@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock
 from packages.db_models.models.action import Action
 from services.gate.service import GateResult

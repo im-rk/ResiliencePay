@@ -21,7 +21,8 @@ genai.configure(api_key=settings.gemini_api_key)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 class NudgeGenerator:
-    def __init__(self, timeout_seconds: float = 5.0):
+    def __init__(self, llm_client=None, timeout_seconds: float = 5.0):
+        self.llm_client = llm_client
         self.timeout_seconds = timeout_seconds
 
     def generate(self, decision, language: str) -> NudgeResult:
@@ -29,8 +30,11 @@ class NudgeGenerator:
         try:
             from services.act.fault_injection import with_fault_injection
             # wrap the call for fault injection testing
-            injected_complete = with_fault_injection(lambda p, t: model.generate_content(p).text)
-            text = injected_complete(prompt, self.timeout_seconds)
+            if self.llm_client is not None:
+                text = self.llm_client.complete(prompt)
+            else:
+                injected_complete = with_fault_injection(lambda p, t: model.generate_content(p).text)
+                text = injected_complete(prompt, self.timeout_seconds)
             return NudgeResult(text=text, method="llm_generated")
         except Exception as e:  # noqa: BLE001 — deliberately broad: ANY LLM failure must fall back, never propagate
             logger.warning("nudge_generation_failed_falling_back", extra={

@@ -2,7 +2,6 @@ import numpy as np
 from datetime import datetime, timedelta, timezone
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 from data.error_code_samples import sample_error_code
-from packages.db_models.factories import EpisodeFactory, EventFactory, CustomerFactory
 
 CAUSE_DISTRIBUTION = {
     CauseCategoryEnum.INSUFFICIENT_FUNDS.value: 0.30,

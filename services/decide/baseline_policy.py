@@ -1,4 +1,4 @@
-from services.decide.bandit import ArmChoice, BanditPolicy
+from services.decide.bandit import ArmChoice
 
 class BaselinePolicy:
     """Represents 'what merchants do today': always retry immediately,

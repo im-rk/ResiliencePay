@@ -1,6 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from packages.db_models.models.episode import Episode
+    from services.decide.bandit import ArmChoice
 
 from packages.config.settings import settings
 from .rules import check_cool_off, check_max_attempts, check_opt_out, check_time_window, check_uncertainty_escalation

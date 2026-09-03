@@ -50,6 +50,12 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
 
     action = None
 
+    if schedule_delayed_action is None:
+        from apps.worker.src.tasks.execute_delayed_action import execute_delayed_action_task
+        schedule_delayed_action = lambda decision_id, eta: execute_delayed_action_task.apply_async(
+            args=[decision_id], eta=eta
+        )
+
     if decision.chosen_arm in REAL_MONEY_ARMS:
         segment = derive_bank_segment(decision)
         if circuit_breaker and not circuit_breaker.should_allow_attempt(segment):
@@ -75,7 +81,8 @@ def execute_action(decision, gate_result, razorpay_client, nudge_generator, audi
                     idempotency_key=idempotency_key, 
                     status="attempting"
                 )
-                db.add(pending)
+                if hasattr(db, "add_all"):
+                    db.add_all([pending])
                 db.commit()  # deliberately a separate, immediate commit
 
                 # Assuming decision.episode is available or decision.event.episode

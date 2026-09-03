@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import insert
-from packages.db_models.models import Action, Outcome, Decision, Event, Episode
+from packages.db_models.models import Action, Outcome, Decision, Event
 
 logger = logging.getLogger(__name__)
 

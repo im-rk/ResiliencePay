@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { apiClient } from "../api";
+import { useEffect, useState } from "react";
 
 interface BanditStat {
   name: string;
@@ -13,7 +12,8 @@ export function InterventionInspector({ event }: { event: any }) {
 
   useEffect(() => {
     if (event && event.cause_category) {
-      fetch(`http://127.0.0.1:8000/api/v1/simulations/bandit-stats?cause_category=${event.cause_category}`)
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+      fetch(`${apiBaseUrl}/v1/simulations/bandit-stats?cause_category=${encodeURIComponent(event.cause_category)}`)
         .then(res => res.json())
         .then(data => {
           if (data && data.arms) {

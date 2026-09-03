@@ -1,5 +1,5 @@
+import google.generativeai as genai
 from packages.config.settings import settings
-import anthropic
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
@@ -31,21 +31,35 @@ TEMPLATE_FALLBACK = (
 )
 
 
+class _GeminiMessages:
+    def __init__(self, model):
+        self.model = model
+
+    def create(self, *, messages, **_kwargs):
+        return self.model.generate_content(messages[-1]["content"])
+
+
+class _GeminiClient:
+    def __init__(self):
+        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        self.messages = _GeminiMessages(self.model)
+
+
 class AuditNarrator:
     def __init__(self, timeout_seconds: float = 5.0):
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        genai.configure(api_key=settings.gemini_api_key)
+        self.client = _GeminiClient()
         self.timeout_seconds = timeout_seconds
 
     def narrate(self, episode_facts: dict) -> EpisodeNarrative:
         prompt = NARRATOR_PROMPT_TEMPLATE.format(**episode_facts)
         try:
             response = self.client.messages.create(
-                model="claude-3-haiku-20240307",
+                model="gemini-1.5-flash",
                 max_tokens=150,
-                timeout=self.timeout_seconds,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
             )
-            text = response.content[0].text
+            text = response.text
             return EpisodeNarrative(text=text, method="llm_generated")
         except Exception:  # guaranteed fallback
             return EpisodeNarrative(

@@ -8,7 +8,10 @@ from services.observe.webhook_handlers import now, hours_between
 from services.observe.reward_service import RewardService
 from services.audit.audit_log_service import AuditLogService
 from packages.db_models.models import Event, Decision, Action, Episode, Outcome
+from packages.db_models.models import Merchant, Customer
 from sqlalchemy.dialects.postgresql import insert
+import uuid
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -48,9 +51,57 @@ class MarkResolvedRequest(BaseModel):
 @router.post("/events/ingest", status_code=202)
 def ingest_event(body: IngestEventRequest, db_session=Depends(get_db_session)):
     """Ingests a new failure event and queues for diagnosis."""
-    # Returns 202 Accepted per API_SPEC.md
+    timestamp = datetime.now(timezone.utc)
+    merchant_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"resiliencepay:merchant:{body.merchant_id}")
+    customer_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"resiliencepay:customer:{body.merchant_id}:{body.customer_id}")
+
+    merchant = db_session.query(Merchant).filter_by(merchant_id=merchant_uuid).first()
+    if merchant is None:
+        merchant = Merchant(
+            merchant_id=merchant_uuid,
+            name=body.merchant_id,
+            razorpay_key_id="test",
+            vertical="general",
+            created_at=timestamp,
+        )
+        db_session.add(merchant)
+
+    customer = db_session.query(Customer).filter_by(customer_id=customer_uuid).first()
+    if customer is None:
+        customer = Customer(
+            customer_id=customer_uuid,
+            merchant_id=merchant_uuid,
+            external_ref=body.customer_id,
+            segment=body.customer_segment,
+            locale="en-IN",
+            created_at=timestamp,
+        )
+        db_session.add(customer)
+
+    episode = Episode(
+        merchant_id=merchant_uuid,
+        customer_id=customer_uuid,
+        episode_type=body.event_type,
+        original_amount=body.amount,
+        currency=body.currency,
+        opened_at=timestamp,
+    )
+    db_session.add(episode)
+    db_session.flush()
+    event = Event(
+        episode_id=episode.episode_id,
+        event_type=body.event_type,
+        gateway_error_code=body.gateway_error_code,
+        raw_gateway_message=body.raw_gateway_message,
+        retry_count_so_far=body.retry_count_so_far,
+        raw_payload=body.model_dump(),
+        occurred_at=timestamp,
+    )
+    db_session.add(event)
+    db_session.commit()
+
     return {
-        "event_id": "evt_live_ingest",
+        "event_id": str(event.event_id),
         "status": "queued_for_diagnosis",
         "amount": body.amount,
     }

@@ -1,9 +1,7 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MetricsSummary } from "./panels/MetricsSummary";
-import { LearningCurveChart } from "./panels/LearningCurveChart";
 import { AuditTrailTable } from "./panels/AuditTrailTable";
-import { ExceptionList } from "./panels/ExceptionList";
 import { LiveEventFeed } from "./panels/LiveEventFeed";
 import { InterventionInspector } from "./panels/InterventionInspector";
 import { SimulationPanel } from "./panels/SimulationPanel";
@@ -22,7 +20,7 @@ function Dashboard() {
   const { events, isConnected, setEvents } = useSimulationStream();
 
   // Stage Safety Net: Press Shift + S to load a perfect cached run if live demo fails
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.shiftKey && e.key === 'S') {
         console.log("Stage Safety Net Activated: Loading cached simulation run...");

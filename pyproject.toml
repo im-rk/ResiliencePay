@@ -27,6 +27,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "--cov=services --cov-fail-under=75"
+testpaths = ["apps", "services", "eval", "data"]
 
 [tool.importlinter]
 root_packages = ["services", "apps", "packages"]

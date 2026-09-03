@@ -1,6 +1,5 @@
 import google.generativeai as genai
 from datetime import date
-from pydantic import ValidationError
 from packages.config.settings import settings
 from services.observe.schemas import PTPExtractionSchema, PTPExtractionResult
 import structlog

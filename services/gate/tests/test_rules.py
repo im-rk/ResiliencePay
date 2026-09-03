@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
 
-from services.gate.rules import check_cool_off, check_max_attempts, check_opt_out, check_time_window, check_uncertainty_escalation
+from services.gate.rules import check_cool_off, check_max_attempts, check_time_window, check_uncertainty_escalation
 from packages.db_models.models.episode import Episode
 from services.decide.bandit import ArmChoice
 

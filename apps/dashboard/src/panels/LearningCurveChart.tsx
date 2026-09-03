@@ -1,4 +1,3 @@
-import React from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from "recharts";
 import { usePolling } from "../hooks/usePolling";
 import { fetchLearningCurve } from "../api/client";
@@ -19,7 +18,7 @@ export function LearningCurveChart({ banditRunId, baselineRunId }: { banditRunId
   if (bandit.isLoading || baseline.isLoading) return <PanelSkeleton label="Loading learning curve…" />;
   if (bandit.isError || baseline.isError) return <PanelError message="Could not load learning curve." />;
 
-  const merged = mergeCurvesByBatchIndex(bandit.data!, baseline.data!);
+  const merged = mergeCurvesByBatchIndex(bandit.data! as any, baseline.data! as any);
 
   return (
     <div className="learning-curve-chart" style={{ width: '100%', height: 300 }}>
@@ -29,7 +28,7 @@ export function LearningCurveChart({ banditRunId, baselineRunId }: { banditRunId
           <XAxis dataKey="batchIndex" stroke="rgba(255,255,255,0.5)" label={{ value: "Batch index", position: "insideBottom", offset: -5, fill: "rgba(255,255,255,0.5)" }} />
           <YAxis domain={[0, 1]} stroke="rgba(255,255,255,0.5)" tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
           <Tooltip 
-            formatter={(v: number) => `${(v * 100).toFixed(1)}%`} 
+            formatter={(v) => `${(Number(v ?? 0) * 100).toFixed(1)}%`}
             contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
             itemStyle={{ color: '#fff' }}
           />

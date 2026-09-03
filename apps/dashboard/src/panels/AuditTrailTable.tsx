@@ -1,13 +1,16 @@
-import React from "react";
+import { usePolling } from "../hooks/usePolling";
+import { fetchAuditTrail, type AuditRow } from "../api/client";
 
 interface AuditTrailTableProps {
-  events: any[];
+  events?: AuditRow[];
 }
 
 export function AuditTrailTable({ events }: AuditTrailTableProps) {
+  const query = usePolling(["audit-trail"], () => fetchAuditTrail({ page: 1 }));
+  const rows = events ?? query.data?.entries ?? [];
   return (
     <div className="audit-trail">
-      {events.length === 0 ? (
+      {rows.length === 0 ? (
         <div style={{ color: 'var(--color-text-secondary)' }}>No audit entries available. Start a simulation run.</div>
       ) : (
         <table style={{ width: '100%', textAlign: 'left', fontSize: '13px' }}>
@@ -22,7 +25,7 @@ export function AuditTrailTable({ events }: AuditTrailTableProps) {
             </tr>
           </thead>
           <tbody>
-            {events.map((row: any, idx: number) => {
+            {rows.map((row: any, idx: number) => {
               const eventId = row.event_id ? row.event_id.split("-")[0] : "EVT_UNKNOWN";
               
               let gateVerdict = "N/A";

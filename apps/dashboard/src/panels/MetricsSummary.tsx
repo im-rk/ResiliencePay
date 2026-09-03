@@ -1,4 +1,3 @@
-import React from "react";
 import { usePolling } from "../hooks/usePolling";
 import { fetchMetricsSummary } from "../api/client";
 import { formatPaise } from "../lib/format";

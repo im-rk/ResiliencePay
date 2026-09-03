@@ -1,4 +1,4 @@
-import React from "react";
+import type { AuditRow } from "../api/client";
 import { usePolling } from "../hooks/usePolling";
 import { fetchExceptions } from "../api/client";
 
@@ -16,7 +16,8 @@ export function ExceptionList({ runId }: { runId: string }) {
   if (isLoading) return <PanelSkeleton label="Loading exceptions…" />;
   if (isError) return <PanelError message="Could not load exceptions." />;
 
-  if (data!.length === 0) {
+  const exceptions = (data ?? []) as AuditRow[];
+  if (exceptions.length === 0) {
     return (
       <div className="exception-list-empty">
         <strong>0 unresolved exceptions.</strong>
@@ -27,7 +28,7 @@ export function ExceptionList({ runId }: { runId: string }) {
 
   return (
     <ul className="exception-list">
-      {data!.map((ex: any) => (
+      {exceptions.map((ex) => (
         <li key={ex.event_id}>
           <span className="cause">{ex.cause_category}</span>
           <span className="reason">{ex.reason}</span>
