@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 export function DemoControls() {
   const [isRunning, setIsRunning] = useState(false);

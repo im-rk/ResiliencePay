@@ -1,28 +1,43 @@
 from fastapi import APIRouter, Request, BackgroundTasks
 from sse_starlette.sse import EventSourceResponse
 from typing import AsyncGenerator
-import json
 import asyncio
 from packages.config.redis_client import redis_client
 
 router = APIRouter()
 
 async def stream_audit_events(request: Request) -> AsyncGenerator[str, None]:
-    pubsub = redis_client.pubsub()
-    pubsub.subscribe("audit_stream")
+    pubsub = None
+    try:
+        pubsub = redis_client.pubsub()
+        pubsub.subscribe("audit_stream")
+    except Exception:
+        # Keep the browser stream alive while Redis is temporarily unavailable.
+        pubsub = None
     try:
         while True:
             if await request.is_disconnected():
                 break
-            
-            message = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+
+            message = None
+            if pubsub is not None:
+                try:
+                    message = pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                except Exception:
+                    pubsub = None
             if message and message["type"] == "message":
                 data = message["data"].decode("utf-8") if isinstance(message["data"], bytes) else message["data"]
                 yield {"data": data}
             else:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)
+                yield {"event": "keepalive", "data": "{}"}
     finally:
-        pubsub.unsubscribe("audit_stream")
+        if pubsub is not None:
+            try:
+                pubsub.unsubscribe("audit_stream")
+                pubsub.close()
+            except Exception:
+                pass
 
 @router.get("/stream")
 async def sse_audit_stream(request: Request):
@@ -30,7 +45,7 @@ async def sse_audit_stream(request: Request):
     Server-Sent Events endpoint that streams new audit log entries in real-time.
     Subscribes to the 'audit_stream' Redis channel.
     """
-    return EventSourceResponse(stream_audit_events(request))
+    return EventSourceResponse(stream_audit_events(request), ping=15)
 
 @router.post("/run")
 def run_batch_simulation(background_tasks: BackgroundTasks):
@@ -44,14 +59,20 @@ def run_batch_simulation(background_tasks: BackgroundTasks):
     # We will wrap it in a try-except for safety.
     def execute_simulation():
         import structlog
+        from packages.db_models.database import SessionLocal
+        from services.decide import get_bandit_policy
+        from packages.config.redis_client import redis_client
         log = structlog.get_logger(__name__)
+        db = SessionLocal()
         try:
             log.info("starting_background_simulation")
-            # We trigger run_batch which uses the real services.
-            run_batch(batch_size=300)
+            bandit = get_bandit_policy(redis_client)
+            run_batch(db_session=db, dataset_seed=42, n=300, policy_name="ThompsonSampling", policy=bandit)
             log.info("finished_background_simulation")
         except Exception as e:
             log.error("background_simulation_failed", error=str(e))
+        finally:
+            db.close()
 
     background_tasks.add_task(execute_simulation)
     return {"status": "started", "message": "Simulation batch triggered on backend"}

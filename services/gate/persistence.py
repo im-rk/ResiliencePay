@@ -1,4 +1,8 @@
 from packages.db_models.models import GateCheck
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.gate.service import GateResult
 
 def record_gate_check(db_session, decision_id, result: "GateResult") -> GateCheck:
     """Every evaluation is recorded, pass or block — this table is the

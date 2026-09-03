@@ -6,6 +6,10 @@ import structlog
 
 from data.generator import generate_batch
 from packages.db_models.models.batch_run import BatchRun, BatchRunMetrics
+from packages.db_models.models import (
+    Merchant, Customer, Episode, Event, Diagnosis, Decision, GateCheck,
+    Action, Outcome, Arm, CauseCategory,
+)
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 from services.audit.audit_log_service import AuditLogService
 from services.decide.bandit import BanditPolicy
@@ -95,9 +99,32 @@ def run_batch(
     if db_session:
         db_session.add(run)
         db_session.flush()
+        merchant_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"resiliencepay:merchant:{merchant_id or 'merch_demo01'}")
+        merchant = db_session.query(Merchant).filter_by(merchant_id=merchant_uuid).first()
+        if merchant is None:
+            merchant = Merchant(
+                merchant_id=merchant_uuid,
+                name=merchant_id or "merch_demo01",
+                razorpay_key_id="test",
+                vertical="general",
+                created_at=start_time,
+            )
+            db_session.add(merchant)
+        for cause_name in CauseCategoryEnum:
+            if not db_session.query(CauseCategory).filter_by(cause_category=cause_name.value).first():
+                db_session.add(CauseCategory(
+                    cause_category=cause_name.value,
+                    description=cause_name.value.replace("_", " "),
+                    typical_recoverable=True,
+                ))
+        for arm_name in policy.get_stats("seed", "seed"):
+            if not db_session.query(Arm).filter_by(arm_name=arm_name).first():
+                db_session.add(Arm(arm_name=arm_name, description=arm_name.replace("_", " "), is_real_action=arm_name.startswith("retry")))
+        db_session.flush()
 
     reward_service = RewardService()
-    audit_log_service = AuditLogService(db_session) if db_session else None
+    from packages.config.redis_client import redis_client
+    audit_log_service = AuditLogService(db_session, redis_client) if db_session else None
     outcome_rng = np.random.default_rng(dataset_seed + 1)
 
     raw_drafts = generate_batch(seed=dataset_seed, n=n, merchant_id=merchant_id or "merch_demo01")
@@ -121,6 +148,71 @@ def run_batch(
         choice = policy.sample_arm(merchant_id or "merch_demo01", context_bucket)
         gate_result = evaluate_gate_for_draft(draft, choice.arm)
 
+        if db_session:
+            customer_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"resiliencepay:customer:{draft['event_id']}")
+            customer = Customer(
+                customer_id=customer_uuid,
+                merchant_id=merchant_uuid,
+                external_ref=str(customer_uuid),
+                segment=draft.get("customer_segment", "new"),
+                locale="en-IN",
+                created_at=draft["occurred_at"],
+            )
+            episode = Episode(
+                episode_id=draft["episode_id"],
+                merchant_id=merchant_uuid,
+                customer_id=customer_uuid,
+                episode_type=draft["event_type"],
+                original_amount=draft["amount"],
+                currency="INR",
+                opened_at=draft["occurred_at"],
+            )
+            event = Event(
+                event_id=draft["event_id"],
+                episode_id=episode.episode_id,
+                event_type=draft["event_type"],
+                gateway_error_code=draft.get("gateway_error_code"),
+                retry_count_so_far=draft.get("retry_count_so_far", 0),
+                occurred_at=draft["occurred_at"],
+                raw_payload={
+                    **draft,
+                    "event_id": str(draft["event_id"]),
+                    "episode_id": str(draft["episode_id"]),
+                    "occurred_at": draft["occurred_at"].isoformat(),
+                },
+            )
+            decision = Decision(
+                decision_id=uuid.uuid4(),
+                event_id=event.event_id,
+                chosen_arm=choice.arm,
+                context_bucket=context_bucket,
+                sampled_score=choice.sampled_score,
+                alpha_at_decision=choice.alpha_at_decision,
+                beta_at_decision=choice.beta_at_decision,
+                decided_at=draft["occurred_at"],
+            )
+            db_session.add_all([customer, episode, event, decision, Diagnosis(
+                event_id=event.event_id,
+                cause_category=diagnosis.cause_category.value,
+                confidence=diagnosis.confidence,
+                method=diagnosis.method,
+                created_at=draft["occurred_at"],
+            ), GateCheck(
+                decision_id=decision.decision_id,
+                result="passed" if gate_result.passed else "blocked",
+                rule_triggered=gate_result.rule_name,
+                checked_at=draft["occurred_at"],
+            )])
+            action = Action(
+                decision_id=decision.decision_id,
+                arm_name=choice.arm,
+                simulated=True,
+                status="executed" if gate_result.passed else "blocked",
+                executed_at=draft["occurred_at"],
+            )
+            db_session.add(action)
+            db_session.flush()
+
         if gate_result.passed:
             sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng)
             reward = reward_service.compute(sim_outcome)
@@ -135,6 +227,18 @@ def run_batch(
             reward = reward_service.REWARD_BLOCKED_BY_POLICY
             policy.update(merchant_id or "merch_demo01", context_bucket, choice.arm, reward)
             sim_outcome = None
+
+        if db_session:
+            action.status = "executed" if gate_result.passed else "blocked"
+            if sim_outcome is not None:
+                db_session.add(Outcome(
+                    action_id=action.action_id,
+                    result=sim_outcome.result,
+                    amount_recovered=sim_outcome.amount_recovered,
+                    reward=reward,
+                    time_to_resolution_hrs=sim_outcome.time_to_resolution_hrs,
+                    observed_at=draft["occurred_at"],
+                ))
 
         if sim_outcome is None or sim_outcome.result == "not_recovered":
             exception_count += 1

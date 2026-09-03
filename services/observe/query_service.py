@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from uuid import UUID
 from packages.db_models.models import Event, BatchRun, BatchRunMetrics, AuditLog
@@ -56,7 +55,10 @@ def get_learning_curve_data(db_session, run_id: str, bucket_size: int = 20) -> l
     points = []
     # If DB session available, query audit log or batch records
     if db_session:
-        records = db_session.query(AuditLog).order_by(AuditLog.recorded_at.asc()).limit(200).all()
+        try:
+            records = db_session.query(AuditLog).order_by(AuditLog.recorded_at.asc()).limit(200).all()
+        except Exception:
+            records = []
         if records:
             running_recovered = 0
             for i, r in enumerate(records, 1):

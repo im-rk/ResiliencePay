@@ -1,5 +1,3 @@
-import pytest
-from unittest.mock import MagicMock
 # Full chain integration test
 # Since setting up a real DB and Redis in this script might be complex without the full 
 # test harness, we verify the logic flow using mocked DB and real Bandit if possible.

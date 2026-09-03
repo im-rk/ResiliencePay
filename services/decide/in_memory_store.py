@@ -1,4 +1,3 @@
-from services.decide.bandit import get_default_prior_for_context
 
 class InMemoryArmStatsStore:
     """In-memory arm stats store with exact same interface as RedisArmStatsStore.

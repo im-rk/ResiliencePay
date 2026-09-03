@@ -144,7 +144,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/v1/admin/fault-injection": {
+    "/v1/audit-trail/{episode_id}/narrative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Episode Narrative */
+        get: operations["episode_narrative_v1_audit_trail__episode_id__narrative_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/fault-injection": {
         parameters: {
             query?: never;
             header?: never;
@@ -157,7 +174,108 @@ export interface paths {
          * Toggle Fault Injection
          * @description Live trigger for admin fault injection.
          */
-        post: operations["toggle_fault_injection_v1_v1_admin_fault_injection_post"];
+        post: operations["toggle_fault_injection_v1_admin_fault_injection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sse Audit Stream
+         * @description Server-Sent Events endpoint that streams new audit log entries in real-time.
+         *     Subscribes to the 'audit_stream' Redis channel.
+         */
+        get: operations["sse_audit_stream_v1_simulations_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Batch Simulation
+         * @description Trigger a backend-driven simulation of 300 events.
+         *     Spawns a background task that writes to the DB and publishes events to the Redis stream.
+         */
+        post: operations["run_batch_simulation_v1_simulations_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/chaos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inject Chaos
+         * @description Toggles the chaos mode flag in Redis, which the Circuit Breaker observes
+         *     to simulate upstream 5xx errors.
+         */
+        post: operations["inject_chaos_v1_simulations_chaos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/simulations/bandit-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bandit Stats
+         * @description Returns the real-time Thompson Sampling distribution parameters (alpha, beta)
+         *     for a given context bucket.
+         */
+        get: operations["get_bandit_stats_v1_simulations_bandit_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/razorpay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Razorpay Webhook */
+        post: operations["razorpay_webhook_v1_webhooks_razorpay_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -244,6 +362,16 @@ export interface components {
              * Format: date-time
              */
             occurred_at: string;
+        };
+        /** FaultInjectionPayload */
+        FaultInjectionPayload: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Rate
+             * @default 0
+             */
+            rate: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -560,12 +688,138 @@ export interface operations {
             };
         };
     };
-    toggle_fault_injection_v1_v1_admin_fault_injection_post: {
+    episode_narrative_v1_audit_trail__episode_id__narrative_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                episode_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_fault_injection_v1_admin_fault_injection_post: {
         parameters: {
             query?: never;
             header: {
                 "x-admin-secret": string;
             };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaultInjectionPayload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sse_audit_stream_v1_simulations_stream_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    run_batch_simulation_v1_simulations_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    inject_chaos_v1_simulations_chaos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_bandit_stats_v1_simulations_bandit_stats_get: {
+        parameters: {
+            query: {
+                cause_category: string;
+            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -587,6 +841,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    razorpay_webhook_v1_webhooks_razorpay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -1,6 +1,4 @@
-import pytest
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from packages.db_models.models.episode import Episode

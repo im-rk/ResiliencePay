@@ -1,6 +1,9 @@
 import os
 from celery import Celery
 from celery.schedules import crontab
+from dotenv import load_dotenv
+
+load_dotenv()
 
 redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 

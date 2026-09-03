@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-from services.act.fault_injection import SimulatedFault
 from services.act.razorpay_client import RazorpayClient, RazorpayTransientError
 from packages.config.settings import settings
 

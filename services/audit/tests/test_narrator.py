@@ -1,6 +1,4 @@
-import pytest
-from unittest.mock import MagicMock
-from services.audit.narrator import AuditNarrator, EpisodeNarrative
+from services.audit.narrator import AuditNarrator
 
 def sample_episode_facts():
     return {

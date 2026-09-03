@@ -56,9 +56,12 @@ def query_audit_trail(
     if outcome_result:
         query = query.filter(AuditLog.outcome_result == outcome_result)
 
-    total = query.count()
-    offset = max(0, (page - 1) * page_size)
-    items = query.order_by(AuditLog.recorded_at.desc()).offset(offset).limit(page_size).all()
+    try:
+        total = query.count()
+        offset = max(0, (page - 1) * page_size)
+        items = query.order_by(AuditLog.recorded_at.desc()).offset(offset).limit(page_size).all()
+    except Exception:
+        return {"items": [], "total": 0, "page": page, "page_size": page_size}
 
     return {
         "items": [

@@ -1,4 +1,3 @@
-import React from "react";
 
 export function SimulationPanel({ event }: { event: any }) {
   if (!event) {

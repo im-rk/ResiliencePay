@@ -1,4 +1,3 @@
-import copy
 import eval.run_batch
 from eval.run_batch import run_batch
 from services.decide.baseline_policy import BaselinePolicy

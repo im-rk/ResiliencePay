@@ -5,7 +5,6 @@ from services.diagnose.service import diagnose
 from packages.db_models.models.merchant import Merchant
 from packages.db_models.database import SessionLocal
 from packages.db_models.models.event import Event
-from packages.db_models.models.episode import Episode
 from packages.db_models.models.customer import Customer
 
 def run_e2e():

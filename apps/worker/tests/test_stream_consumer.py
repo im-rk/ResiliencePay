@@ -1,5 +1,3 @@
-import pytest
-import json
 from unittest.mock import MagicMock, patch
 from apps.worker.src.stream_consumer import consume_webhook_events_durable
 

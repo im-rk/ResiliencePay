@@ -14,7 +14,7 @@ class FaultInjectionPayload(BaseModel):
     enabled: bool
     rate: float = 0.0
 
-@router.post("/v1/admin/fault-injection", dependencies=[Depends(require_admin_secret)])
+@router.post("/admin/fault-injection", dependencies=[Depends(require_admin_secret)])
 def toggle_fault_injection(payload: FaultInjectionPayload):
     """Live trigger for admin fault injection."""
     from packages.config.settings import settings

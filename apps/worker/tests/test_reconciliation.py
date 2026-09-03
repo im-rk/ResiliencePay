@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from apps.worker.src.tasks.reconcile_payment_status import reconcile_payment_status
 

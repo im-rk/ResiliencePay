@@ -395,22 +395,21 @@
         }
       }
     },
-    "/v1/v1/admin/fault-injection": {
-      "post": {
+    "/v1/audit-trail/{episode_id}/narrative": {
+      "get": {
         "tags": [
-          "admin"
+          "audit"
         ],
-        "summary": "Toggle Fault Injection",
-        "description": "Live trigger for admin fault injection.",
-        "operationId": "toggle_fault_injection_v1_v1_admin_fault_injection_post",
+        "summary": "Episode Narrative",
+        "operationId": "episode_narrative_v1_audit_trail__episode_id__narrative_get",
         "parameters": [
           {
-            "name": "x-admin-secret",
-            "in": "header",
+            "name": "episode_id",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "X-Admin-Secret"
+              "title": "Episode Id"
             }
           }
         ],
@@ -430,6 +429,177 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/fault-injection": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Toggle Fault Injection",
+        "description": "Live trigger for admin fault injection.",
+        "operationId": "toggle_fault_injection_v1_admin_fault_injection_post",
+        "parameters": [
+          {
+            "name": "x-admin-secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Secret"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaultInjectionPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/simulations/stream": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Sse Audit Stream",
+        "description": "Server-Sent Events endpoint that streams new audit log entries in real-time.\nSubscribes to the 'audit_stream' Redis channel.",
+        "operationId": "sse_audit_stream_v1_simulations_stream_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/simulations/run": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Run Batch Simulation",
+        "description": "Trigger a backend-driven simulation of 300 events.\nSpawns a background task that writes to the DB and publishes events to the Redis stream.",
+        "operationId": "run_batch_simulation_v1_simulations_run_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/simulations/chaos": {
+      "post": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Inject Chaos",
+        "description": "Toggles the chaos mode flag in Redis, which the Circuit Breaker observes\nto simulate upstream 5xx errors.",
+        "operationId": "inject_chaos_v1_simulations_chaos_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/simulations/bandit-stats": {
+      "get": {
+        "tags": [
+          "simulations"
+        ],
+        "summary": "Get Bandit Stats",
+        "description": "Returns the real-time Thompson Sampling distribution parameters (alpha, beta)\nfor a given context bucket.",
+        "operationId": "get_bandit_stats_v1_simulations_bandit_stats_get",
+        "parameters": [
+          {
+            "name": "cause_category",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cause Category"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/razorpay": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Razorpay Webhook",
+        "operationId": "razorpay_webhook_v1_webhooks_razorpay_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -594,6 +764,24 @@
           "occurred_at"
         ],
         "title": "EventStateDTO"
+      },
+      "FaultInjectionPayload": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "rate": {
+            "type": "number",
+            "title": "Rate",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "FaultInjectionPayload"
       },
       "HTTPValidationError": {
         "properties": {

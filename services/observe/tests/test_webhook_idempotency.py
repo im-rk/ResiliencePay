@@ -1,7 +1,5 @@
-import pytest
 from unittest.mock import MagicMock
 from services.observe.webhook_handlers import handle_payment_captured_webhook
-from packages.db_models.models import Action, Outcome
 
 def test_duplicate_webhook_delivery_is_idempotent(mocker):
     # Mock DB session

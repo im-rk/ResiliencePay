@@ -1,4 +1,3 @@
-import pytest
 import uuid
 from datetime import timedelta
 from unittest.mock import MagicMock

@@ -7,19 +7,39 @@ thing to build.**
 
 ## 1. What's actually real and running (verified, not just documented)
 
+### Verification record — 2026-09-02
+
+- Local backend/service tests: **83 passed** when run with the repository's
+   application and service test paths.
+- Dashboard tests: **7 passed**; production TypeScript/Vite build succeeds.
+- API health, metrics, audit fallback, CORS, and the SSE route were exercised
+   locally. The dashboard now reconnects after a temporary SSE outage.
+- `.env` contains configured `DATABASE_URL`, `REDIS_URL`, `GEMINI_API_KEY`,
+   and Razorpay variables. Secrets were not printed.
+- Live Supabase and Upstash connectivity are **not verified**: the configured
+   endpoints refused connections during the last smoke test. Real database
+   writes, Redis-backed bandit updates, and Razorpay calls therefore remain
+   release blockers.
+- The full default test selection includes data tests that require the live
+   database schema; scratch probes are excluded by `testpaths`.
+
 - **Phase 0 (Foundations):** `pyproject.toml` workspace, Pydantic `Settings` class (validated at boot), `docker-compose.yml` with health checks, `.env.example`.
-- **Phase 1 (Data Layer):** All 16 tables from `DATABASE_DESIGN.md` implemented as SQLAlchemy models, 6 Alembic migrations, run end-to-end against a **real, live Postgres 16 instance**.
-- **Phase 2-3 (Synthetic Data & Diagnose):** Generating realistic failed payment events, with rule-based and LLM-fallback diagnosis (Gemini integration verified).
+- **Phase 1 (Data Layer):** All 16 tables from `DATABASE_DESIGN.md` implemented as SQLAlchemy models, with Alembic migrations. Live Supabase schema verification is still pending.
+- **Phase 2-3 (Synthetic Data & Diagnose):** Generating realistic failed payment events, with rule-based diagnosis and Gemini fallback covered by tests. Live Gemini verification is still pending.
 - **Phase 4 (Gate):** Deterministic compliance checks verified against adversarial ML conditions. `GateContext` structurally enforces independence.
-- **Phase 5-7 (Decide, Act, Observe):** Contextual bandit actively routing actions, real Razorpay API interactions (and simulated LLM nudges), logging to append-only audit trail.
+- **Phase 5-7 (Decide, Act, Observe):** Contextual bandit, Razorpay wrapper, simulated LLM nudges, webhook handlers, and audit logging are implemented and unit-tested. Live Redis/Razorpay/webhook verification is still pending.
 - **Phase 8 (Batch Eval):** `run_batch.py` script running synthetic multi-seed evaluations.
 - **Phase 9-10 (API & Dashboard):** Live React frontend visualizing metrics, the learning curve, and the audit trail dynamically.
-- **Phase 11 (Resilience/Chaos):** Validated fault injection endpoints ensuring no silent data loss during Razorpay transient outages.
+- **Phase 11 (Resilience/Chaos):** Fault injection and no-gap behavior are covered by tests; a live 15% chaos run remains to be rehearsed.
 - **Phase 12 (Submission):** Documentation parity achieved.
+- **Advanced Features:** Semantic caching/LLM fallback, payment-instrument context, promise-to-pay extraction, circuit breaking, narrator, and Redis Streams ingestion have implementation and unit coverage. They are not all proven against live external services yet.
 
 ## 2. What's fully documented but not yet coded
 
-*(All core phases are coded and tested. This section is empty.)*
+The remaining release-level work is live infrastructure verification: restore
+Supabase and Upstash connectivity, run a real batch, verify Redis state and
+audit immutability, exercise Razorpay test-mode webhooks, and rehearse the
+dashboard on the presentation machine.
 
 ## 3. The critical path — what actually blocks your demo, in order
 
@@ -33,9 +53,10 @@ Phase 10 (dashboard)  ←  Phase 9 (API)  ←  Phase 8 (batch eval)  ←  Phase 
                                           Phase 12 (submission)
 ```
 
-**Nothing downstream of Phase 2 can be tested end-to-end until Phase 2
-exists**, because every later phase's tests need real event data to
-operate on. This is the single most valuable next thing to build.
+**The core code exists, but end-to-end confidence is currently limited by
+unreachable Supabase and Upstash endpoints.** Restore those connections
+before treating the dashboard numbers or live event workflow as release
+evidence.
 
 ## 4. Recommended sequencing given limited remaining time
 

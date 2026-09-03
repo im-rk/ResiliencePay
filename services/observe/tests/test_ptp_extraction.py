@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from datetime import date
 from services.observe.ptp_extraction import extract_promise_to_pay

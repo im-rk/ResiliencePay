@@ -3,8 +3,7 @@ from factory.alchemy import SQLAlchemyModelFactory
 from packages.db_models.database import SessionLocal
 from packages.db_models.models import (
     Merchant, Customer, OptOut, Episode, Event,
-    Diagnosis, Decision, GateCheck, Action, Outcome,
-    CauseCategory, Arm
+    Diagnosis, Decision, GateCheck, Action, Outcome
 )
 
 class BaseFactory(SQLAlchemyModelFactory):

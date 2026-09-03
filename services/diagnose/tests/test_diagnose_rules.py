@@ -1,4 +1,3 @@
-import pytest
 from services.diagnose.rules import RULES
 from data.error_code_samples import ERROR_CODE_POOLS
 from packages.domain_constants.cause_categories import CauseCategoryEnum
