@@ -1,9 +1,8 @@
 export function mergeCurvesByBatchIndex(
-  banditCurve: { batch_index: number; recovery_rate: number }[],
-  baselineCurve: { batch_index: number; recovery_rate: number }[]
+  banditCurve: { batch_index: number; recovery_rate: number }[] | undefined,
+  baselineCurve: { batch_index: number; recovery_rate: number }[] | undefined
 ) {
-  // We want to align series of mismatched length without crashing.
-  // Take the shortest length to align.
+  if (!banditCurve || !baselineCurve) return [];
   const length = Math.min(banditCurve.length, baselineCurve.length);
   const merged = [];
   
