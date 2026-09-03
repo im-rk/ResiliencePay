@@ -69,7 +69,7 @@ function Dashboard() {
         {/* Left Column: Live Event Feed */}
         <section className="glass-panel feed-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Live Event Feed</h2>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="panel-scroll" style={{ flex: 1 }}>
             <LiveEventFeed events={events} isConnected={isConnected} onSelectEvent={setSelectedEvent} selectedEventId={selectedEvent?.event_id} />
           </div>
         </section>
@@ -77,7 +77,7 @@ function Dashboard() {
         {/* Center Column: Inspector */}
         <section className="glass-panel inspector-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Intervention Inspector</h2>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="panel-scroll" style={{ flex: 1 }}>
             <InterventionInspector event={selectedEvent} />
           </div>
         </section>
@@ -85,7 +85,7 @@ function Dashboard() {
         {/* Right Column: Simulator */}
         <section className="glass-panel simulator-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Customer Simulation</h2>
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel-scroll simulation-scroll" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SimulationPanel event={selectedEvent} />
           </div>
         </section>
@@ -94,7 +94,7 @@ function Dashboard() {
       {/* Bottom Drawer: Audit Trail */}
       <footer className="glass-panel audit-footer" style={{ marginTop: '16px', padding: '16px' }}>
         <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Immutable Audit Ledger</h2>
-        <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+        <div className="audit-scroll" style={{ maxHeight: '240px' }}>
           <AuditTrailTable events={events} />
         </div>
       </footer>

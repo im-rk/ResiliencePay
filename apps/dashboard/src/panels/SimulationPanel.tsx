@@ -8,8 +8,11 @@ export function SimulationPanel({ event }: { event: any }) {
     );
   }
 
-  // Render different simulators based on the arm
-  if (event.chosen_arm === "WHATSAPP_NUDGE" || event.chosen_arm === "SMS_NUDGE") {
+  const arm = event.chosen_arm;
+  const cause = event.cause_category || "the reported gateway issue";
+
+  if (["send_nudge_hinglish", "send_nudge_english", "WHATSAPP_NUDGE", "SMS_NUDGE"].includes(arm)) {
+    const hinglish = arm === "send_nudge_hinglish";
     return (
       <div style={{ 
         width: '100%', maxWidth: '300px', background: '#e5ddd5', 
@@ -17,11 +20,11 @@ export function SimulationPanel({ event }: { event: any }) {
         boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
       }}>
         <div style={{ background: '#075e54', padding: '16px', color: '#fff', fontWeight: 'bold' }}>
-          WhatsApp Simulator
+          {hinglish ? "Hinglish nudge preview" : "Customer message preview"}
         </div>
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")' }}>
           <div style={{ background: '#fff', padding: '8px 12px', borderRadius: '0 8px 8px 8px', maxWidth: '85%', fontSize: '14px', alignSelf: 'flex-start' }}>
-            Hi! This is ResiliencePay. Your recent payment of ₹5,000 failed due to {event.cause_category}. 
+            {hinglish ? "Namaste! Aapka payment complete nahi hua." : "Hi! Your recent payment did not go through."} The issue was {cause}.
             <br/><br/>
             No worries! You can complete it using the link below:
             <br/>
@@ -32,7 +35,8 @@ export function SimulationPanel({ event }: { event: any }) {
     );
   }
 
-  if (event.chosen_arm === "DEFER_RETRY" || event.chosen_arm === "SILENT_RETRY") {
+  if (["retry_immediate", "retry_short_delay", "retry_long_delay", "DEFER_RETRY", "SILENT_RETRY"].includes(arm)) {
+    const delayed = arm !== "retry_immediate" && arm !== "SILENT_RETRY";
     return (
       <div style={{ 
         width: '100%', maxWidth: '300px', background: '#fff', 
@@ -47,18 +51,56 @@ export function SimulationPanel({ event }: { event: any }) {
         </div>
         <div style={{ padding: '20px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>
-            {event.chosen_arm === "DEFER_RETRY" ? "Retrying later" : "Retrying silently..."}
+            {delayed ? (arm === "retry_long_delay" ? "Retry scheduled in 3 days" : "Retry scheduled in 4 hours") : "Retrying now"}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
              <div className="skeleton" style={{ width: '24px', height: '24px', borderRadius: '50%', animation: 'pulse 1.5s infinite' }}></div>
-             <span style={{ fontSize: '14px', color: '#0f172a' }}>Attempting via Razorpay API...</span>
+             <span style={{ fontSize: '14px', color: '#0f172a' }}>{delayed ? "Waiting for the scheduled retry window..." : "Attempting via Razorpay API..."}</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Default / No Action
+  if (arm === "send_card_update_link") {
+    return (
+      <div className="simulation-artifact simulation-card-update">
+        <div className="simulation-artifact-header">Card update required</div>
+        <div className="simulation-artifact-body">
+          <div className="payment-card-icon">CARD</div>
+          <strong>Your saved card needs attention</strong>
+          <p>The payment failed because of {cause}. Update the payment method before trying again.</p>
+          <button className="btn-primary" type="button">Update payment method</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (arm === "escalate_human") {
+    return (
+      <div className="simulation-artifact simulation-escalation">
+        <div className="simulation-artifact-header">Human review queue</div>
+        <div className="simulation-artifact-body">
+          <strong>Escalation created</strong>
+          <p>This case is routed to an operator because {cause} needs manual attention.</p>
+          <span className="simulation-status">PENDING REVIEW</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (arm === "stop") {
+    return (
+      <div className="simulation-artifact simulation-stop">
+        <div className="simulation-artifact-header">Recovery stopped safely</div>
+        <div className="simulation-artifact-body">
+          <strong>No customer action sent</strong>
+          <p>The policy selected a terminal stop for {cause}.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ color: 'var(--color-text-secondary)', textAlign: 'center' }}>
       <p>No visual artifact for arm:</p>

@@ -1,4 +1,6 @@
 
+import { useEffect, useRef } from "react";
+
 interface LiveEventFeedProps {
   events: any[];
   isConnected: boolean;
@@ -7,6 +9,11 @@ interface LiveEventFeedProps {
 }
 
 export function LiveEventFeed({ events, isConnected, onSelectEvent, selectedEventId }: LiveEventFeedProps) {
+  const feedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (feedRef.current) feedRef.current.scrollTop = 0;
+  }, [events.length]);
 
   if (!isConnected && events.length === 0) {
     return (
@@ -20,7 +27,7 @@ export function LiveEventFeed({ events, isConnected, onSelectEvent, selectedEven
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '8px' }}>
+    <div ref={feedRef} className="panel-scroll-content" style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '8px' }}>
       {events.map((evt, idx) => {
         const isSelected = selectedEventId === evt.event_id;
         

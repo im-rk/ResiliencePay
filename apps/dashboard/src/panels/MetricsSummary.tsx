@@ -65,7 +65,7 @@ export function MetricsSummary({ banditRunId, baselineRunId }: { banditRunId: st
       
       {/* 2. Bandit Convergence Chart */}
       <div style={{ width: '350px', height: '80px' }}>
-         <LearningCurveChart banditRunId={banditRunId} baselineRunId={baselineRunId} />
+         <LearningCurveChart banditRunId={banditRunId} baselineRunId={baselineRunId} compact />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useState } from "react";
 export function DemoControls() {
   const [isRunning, setIsRunning] = useState(false);
   const [chaosEnabled, setChaosEnabled] = useState(false);
+  const [chaosMessage, setChaosMessage] = useState("");
 
   const handleRunBatch = async () => {
     setIsRunning(true);
@@ -24,13 +25,15 @@ export function DemoControls() {
       });
       const data = await res.json();
       setChaosEnabled(data.status === "chaos_enabled");
+      setChaosMessage(data.status === "chaos_enabled" ? "Chaos mode enabled" : "Chaos mode disabled");
     } catch (e) {
       console.error("Failed to inject chaos", e);
+      setChaosMessage("Chaos mode unavailable: check Redis");
     }
   };
 
   return (
-    <div style={{ display: 'flex', gap: '12px' }}>
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
       <button 
         className="btn-primary" 
         onClick={handleRunBatch}
@@ -39,6 +42,7 @@ export function DemoControls() {
       >
         {isRunning ? "Starting..." : "Run Batch Simulation (300)"}
       </button>
+      {chaosMessage && <span className={chaosEnabled ? "text-danger" : "text-muted"} style={{ fontSize: '11px' }}>{chaosMessage}</span>}
 
       <button 
         className="btn-primary" 
