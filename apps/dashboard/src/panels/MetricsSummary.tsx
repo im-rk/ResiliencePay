@@ -23,49 +23,45 @@ export function MetricsSummary({ banditRunId, baselineRunId }: { banditRunId: st
   const totalAtRisk = 5000000; // ₹50,000.00
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) 2fr', gap: '20px' }}>
       
       {/* 1. Executive Metrics */}
-      <div style={{ display: 'flex', gap: '32px', flex: 1 }}>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Total At-Risk Volume</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{formatPaise(totalAtRisk)}</div>
-        </div>
-        
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Recovered Revenue</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--color-success)' }}>{formatPaise(banditData.amount_recovered)}</div>
-        </div>
+      <div className="metric-card" style={{ '--card-accent': 'var(--color-danger)' } as any}>
+        <div className="metric-title">Revenue at Risk</div>
+        <div className="metric-value text-danger">{formatPaise(totalAtRisk)}</div>
+      </div>
+      
+      <div className="metric-card" style={{ '--card-accent': 'var(--color-warning)' } as any}>
+        <div className="metric-title">Recoverable Revenue</div>
+        <div className="metric-value text-warning">{formatPaise(totalAtRisk * 0.8)}</div>
+      </div>
+      
+      <div className="metric-card" style={{ '--card-accent': 'var(--color-success)' } as any}>
+        <div className="metric-title">Recovered Revenue</div>
+        <div className="metric-value text-success">{formatPaise(banditData.amount_recovered)}</div>
+      </div>
 
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Recovery Rate</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{(banditData.recovery_rate * 100).toFixed(1)}%</div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>vs {(baselineData.recovery_rate * 100).toFixed(1)}%</div>
-            <div style={{ 
-              background: lift > 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255,255,255,0.1)', 
-              color: lift > 0 ? 'var(--color-success)' : '#fff',
-              padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' 
-            }}>
-              {lift > 0 ? '+' : ''}{(lift * 100).toFixed(1)} pts
-            </div>
-          </div>
-        </div>
-        
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Compliance Gate Adherence</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-success)', display: 'flex', alignItems: 'center', height: '32px' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-            </svg>
-            100% (0 violations)
+      <div className="metric-card" style={{ '--card-accent': 'var(--color-accent)' } as any}>
+        <div className="metric-title">Recovery Rate</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <div className="metric-value text-accent">{(banditData.recovery_rate * 100).toFixed(1)}%</div>
+          <div className="badge success">
+            {lift > 0 ? '+' : ''}{(lift * 100).toFixed(1)} pts vs baseline
           </div>
         </div>
       </div>
       
-      {/* 2. Bandit Convergence Chart */}
-      <div style={{ width: '350px', height: '80px' }}>
-         <LearningCurveChart banditRunId={banditRunId} baselineRunId={baselineRunId} compact />
+      {/* 2. Bandit Convergence Chart - Fits into the grid */}
+      <div style={{ background: 'rgba(30, 41, 59, 0.4)', borderRadius: '16px', padding: '16px', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+           <div className="metric-title" style={{ margin: 0 }}>Bandit Learning Curve</div>
+           <div className="badge success" style={{ padding: '2px 8px', fontSize: '10px' }}>
+             <span className="badge-dot" /> Auto-optimizing
+           </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0 }}>
+           <LearningCurveChart banditRunId={banditRunId} baselineRunId={baselineRunId} compact />
+        </div>
       </div>
     </div>
   );

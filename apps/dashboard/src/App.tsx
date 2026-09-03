@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Activity, LayoutDashboard, Search, ShieldCheck, TerminalSquare } from "lucide-react";
 import { MetricsSummary } from "./panels/MetricsSummary";
 import { AuditTrailTable } from "./panels/AuditTrailTable";
 import { LiveEventFeed } from "./panels/LiveEventFeed";
@@ -15,11 +16,13 @@ const queryClient = new QueryClient();
 const DEMO_BANDIT_RUN_ID = "run_demo_bandit";
 const DEMO_BASELINE_RUN_ID = "run_demo_baseline";
 
+type ViewTab = 'dashboard' | 'cases' | 'audit' | 'simulation';
+
 function Dashboard() {
+  const [activeTab, setActiveTab] = useState<ViewTab>('dashboard');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const { events, isConnected, setEvents } = useSimulationStream();
 
-  // Stage Safety Net: Press Shift + S to load a perfect cached run if live demo fails
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.shiftKey && e.key === 'S') {
@@ -41,63 +44,112 @@ function Dashboard() {
   }, [setEvents]);
 
   return (
-    <div className="dashboard-container animate-fade-in">
-      <header className="dashboard-header glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderRadius: '0 0 16px 16px', borderTop: 'none', padding: '16px 24px' }}>
-        <div>
-          <h1 style={{ marginBottom: '4px', textAlign: 'left', fontSize: '20px' }}>ResiliencePay Console</h1>
-          <p className="text-muted" style={{ margin: 0, textAlign: 'left', fontSize: '12px' }}>High-Density Operations & Experimentation</p>
+    <div className="app-container">
+      {/* Top Navigation */}
+      <nav className="top-nav">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--color-accent), #3b82f6)', display: 'grid', placeItems: 'center' }}>
+              <ShieldCheck size={18} color="white" />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '18px', margin: 0, lineHeight: 1.2 }}>ResiliencePay</h1>
+              <div style={{ fontSize: '11px', color: 'var(--color-accent)', fontWeight: 600, letterSpacing: '0.05em' }}>AI RECOVERY AGENT</div>
+            </div>
+          </div>
+          
+          <div className="nav-tabs">
+            <button className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+              <LayoutDashboard size={16} /> Dashboard
+            </button>
+            <button className={`nav-tab ${activeTab === 'cases' ? 'active' : ''}`} onClick={() => setActiveTab('cases')}>
+              <Search size={16} /> Recovery Cases
+            </button>
+            <button className={`nav-tab ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
+              <Activity size={16} /> Audit Ledger
+            </button>
+            <button className={`nav-tab ${activeTab === 'simulation' ? 'active' : ''}`} onClick={() => setActiveTab('simulation')}>
+              <TerminalSquare size={16} /> Simulator
+            </button>
+          </div>
         </div>
         
-        <DemoControls />
-        
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '12px', fontWeight: 500 }}>Demo Admin</div>
-            <div className={isConnected ? "text-success" : "text-danger"} style={{ fontSize: '10px' }}>
-              ● {isConnected ? "Live Stream Active" : "Stream Disconnected"}
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <DemoControls />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '24px', borderLeft: '1px solid var(--glass-border)' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Demo Admin</div>
+              <div style={{ fontSize: '10px', color: isConnected ? 'var(--color-success)' : 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                <span className="badge-dot" style={{ background: isConnected ? 'var(--color-success)' : 'var(--color-danger)' }} />
+                {isConnected ? "Live Stream Active" : "Stream Disconnected"}
+              </div>
+            </div>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', border: '1px solid var(--glass-border)', display: 'grid', placeItems: 'center', color: 'var(--color-text-primary)' }}>
+              DA
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Top Bar: Executive Benchmarks */}
-      <div className="metrics-top-bar glass-panel" style={{ marginBottom: '16px', padding: '16px' }}>
-         <MetricsSummary banditRunId={DEMO_BANDIT_RUN_ID} baselineRunId={DEMO_BASELINE_RUN_ID} />
-      </div>
-      
-      <main className="dashboard-grid-dense">
-        {/* Left Column: Live Event Feed */}
-        <section className="glass-panel feed-panel" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Live Event Feed</h2>
-          <div className="panel-scroll" style={{ flex: 1 }}>
-            <LiveEventFeed events={events} isConnected={isConnected} onSelectEvent={setSelectedEvent} selectedEventId={selectedEvent?.event_id} />
+      <main className="view-container animate-fade-in">
+        {/* DASHBOARD VIEW */}
+        {activeTab === 'dashboard' && (
+          <div className="animate-fade-in">
+            <div style={{ marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Executive Overview</h2>
+              <p className="text-muted">Real-time revenue recovery metrics and AI performance.</p>
+            </div>
+            <MetricsSummary banditRunId={DEMO_BANDIT_RUN_ID} baselineRunId={DEMO_BASELINE_RUN_ID} />
           </div>
-        </section>
+        )}
 
-        {/* Center Column: Inspector */}
-        <section className="glass-panel inspector-panel" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Intervention Inspector</h2>
-          <div className="panel-scroll" style={{ flex: 1 }}>
-            <InterventionInspector event={selectedEvent} />
+        {/* CASES VIEW */}
+        {activeTab === 'cases' && (
+          <div className="animate-fade-in" style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 180px)' }}>
+            <div style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
+              <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Active Cases</h2>
+              <div className="glass-panel" style={{ flex: 1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                   <LiveEventFeed events={events} isConnected={isConnected} onSelectEvent={setSelectedEvent} selectedEventId={selectedEvent?.event_id} />
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ flex: '1.2', display: 'flex', flexDirection: 'column' }}>
+               <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Case Inspector</h2>
+               <div className="glass-panel" style={{ flex: 1, overflowY: 'auto' }}>
+                  <InterventionInspector event={selectedEvent} />
+               </div>
+            </div>
           </div>
-        </section>
+        )}
 
-        {/* Right Column: Simulator */}
-        <section className="glass-panel simulator-panel" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Customer Simulation</h2>
-          <div className="panel-scroll simulation-scroll" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SimulationPanel event={selectedEvent} />
+        {/* AUDIT VIEW */}
+        {activeTab === 'audit' && (
+          <div className="animate-fade-in" style={{ height: 'calc(100vh - 180px)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Immutable Audit Ledger</h2>
+              <p className="text-muted">Cryptographically verifiable log of all AI decisions, compliance checks, and recovery actions.</p>
+            </div>
+            <div className="glass-panel" style={{ flex: 1, padding: 0, overflowY: 'auto' }}>
+               <AuditTrailTable events={events} />
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* SIMULATION VIEW */}
+        {activeTab === 'simulation' && (
+          <div className="animate-fade-in" style={{ height: 'calc(100vh - 180px)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: '800px' }}>
+               <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+                 <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Customer Simulation</h2>
+                 <p className="text-muted">Generate synthetic payment failures to test the recovery agent live.</p>
+               </div>
+               <SimulationPanel event={selectedEvent} />
+            </div>
+          </div>
+        )}
       </main>
-
-      {/* Bottom Drawer: Audit Trail */}
-      <footer className="glass-panel audit-footer" style={{ marginTop: '16px', padding: '16px' }}>
-        <h2 style={{ fontSize: '16px', marginBottom: '16px' }}>Immutable Audit Ledger</h2>
-        <div className="audit-scroll" style={{ maxHeight: '240px' }}>
-          <AuditTrailTable events={events} />
-        </div>
-      </footer>
     </div>
   );
 }
