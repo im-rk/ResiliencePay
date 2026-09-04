@@ -22,16 +22,10 @@ def trigger_batch_run(body: RunBatchRequest, db_session=Depends(get_db_session))
     if body.policy == "baseline":
         policy_obj = BaselinePolicy()
     else:
-        try:
-            from packages.config.redis_client import redis_client
-            redis_client.ping()
-            from services.decide.redis_store import RedisArmStatsStore
-            from services.decide.bandit import ARMS
-            default_priors = {arm: (1.0, 2.0) for arm in ARMS}
-            store = RedisArmStatsStore(redis_client, default_priors)
-            policy_obj = ThompsonSamplingBandit(store)
-        except Exception:
-            policy_obj = ThompsonSamplingBandit(InMemoryArmStatsStore())
+        from services.decide.bandit import ARMS
+        default_priors = {arm: (1.0, 2.0) for arm in ARMS}
+        in_memory_store = InMemoryArmStatsStore(default_priors)
+        policy_obj = ThompsonSamplingBandit(in_memory_store)
 
     run = run_batch(
         db_session=db_session,

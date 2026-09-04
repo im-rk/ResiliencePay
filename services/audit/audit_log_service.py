@@ -5,6 +5,9 @@ logger = structlog.get_logger(__name__)
 
 
 import json
+from concurrent.futures import ThreadPoolExecutor
+
+_audit_publisher_pool = ThreadPoolExecutor(max_workers=4)
 
 class AuditLogService:
     """The ONLY code path permitted to write to the audit_log table.
@@ -29,9 +32,17 @@ class AuditLogService:
                 if "recorded_at" not in payload:
                     from datetime import datetime, timezone
                     payload["recorded_at"] = datetime.now(timezone.utc).isoformat()
-                self.redis_client.publish("audit_stream", json.dumps(payload))
+                msg = json.dumps(payload)
+                _audit_publisher_pool.submit(self._do_publish, msg)
             except Exception as e:
                 logger.error("failed_to_publish_audit_event", error=str(e))
+
+    def _do_publish(self, msg: str):
+        try:
+            if self.redis_client:
+                self.redis_client.publish("audit_stream", msg)
+        except Exception as e:
+            logger.debug("redis_publish_background_error", error=str(e))
 
     def write(self, event, decision=None, gate_result=None, outcome=None):
         """Write an audit row from ORM objects (live pipeline path)."""

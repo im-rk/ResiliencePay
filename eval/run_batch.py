@@ -127,7 +127,7 @@ def run_batch(
 
     reward_service = RewardService()
     from packages.config.redis_client import redis_client
-    audit_log_service = AuditLogService(db_session, redis_client) if db_session else None
+    audit_log_service = AuditLogService(db_session, None) if db_session else None
     outcome_rng = np.random.default_rng(dataset_seed + 1)
 
     raw_drafts = generate_batch(seed=dataset_seed, n=n, merchant_id=merchant_id or "merch_demo01")
@@ -150,6 +150,15 @@ def run_batch(
     amount_at_risk_total = 0
     recovered_count = 0
     resolution_times = []
+
+    batch_customers = []
+    batch_episodes = []
+    batch_events = []
+    batch_decisions = []
+    batch_diagnoses = []
+    batch_gate_checks = []
+    batch_actions = []
+    batch_outcomes = []
 
     for raw in raw_drafts:
         draft = copy.deepcopy(raw)
@@ -210,40 +219,34 @@ def run_batch(
                 decided_at=draft["occurred_at"],
             )
             
-            db_session.add(customer)
-            db_session.add(episode)
-            db_session.add(event)
-            db_session.flush()
-
-            db_session.add(decision)
-            db_session.flush()
-
-            db_session.add_all([
-                Diagnosis(
-                    event_id=event.event_id,
-                    cause_category=diagnosis.cause_category.value,
-                    confidence=diagnosis.confidence,
-                    method=diagnosis.method,
-                    created_at=draft["occurred_at"],
-                ),
-                GateCheck(
-                    decision_id=decision.decision_id,
-                    result="passed" if gate_result.passed else "blocked",
-                    rule_triggered=gate_result.rule_name,
-                    checked_at=draft["occurred_at"],
-                )
-            ])
-            db_session.flush()
-
+            action_id = uuid.uuid4()
             action = Action(
+                action_id=action_id,
                 decision_id=decision.decision_id,
                 arm_name=choice.arm,
                 simulated=True,
                 status="executed" if gate_result.passed else "blocked",
                 executed_at=draft["occurred_at"],
             )
-            db_session.add(action)
-            db_session.flush()
+
+            batch_customers.append(customer)
+            batch_episodes.append(episode)
+            batch_events.append(event)
+            batch_decisions.append(decision)
+            batch_diagnoses.append(Diagnosis(
+                event_id=event.event_id,
+                cause_category=diagnosis.cause_category.value,
+                confidence=diagnosis.confidence,
+                method=diagnosis.method,
+                created_at=draft["occurred_at"],
+            ))
+            batch_gate_checks.append(GateCheck(
+                decision_id=decision.decision_id,
+                result="passed" if gate_result.passed else "blocked",
+                rule_triggered=gate_result.rule_name,
+                checked_at=draft["occurred_at"],
+            ))
+            batch_actions.append(action)
 
         if gate_result.passed:
             sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng, chaos_active=chaos_active)
@@ -263,8 +266,8 @@ def run_batch(
         if db_session:
             action.status = "executed" if gate_result.passed else "blocked"
             if sim_outcome is not None:
-                db_session.add(Outcome(
-                    action_id=action.action_id,
+                batch_outcomes.append(Outcome(
+                    action_id=action_id,
                     result=sim_outcome.result,
                     amount_recovered=sim_outcome.amount_recovered,
                     reward=reward,
@@ -283,6 +286,24 @@ def run_batch(
                 outcome=sim_outcome,
                 reward=reward,
             )
+
+    if db_session:
+        db_session.add_all(batch_customers)
+        db_session.add_all(batch_episodes)
+        db_session.add_all(batch_events)
+        db_session.flush()
+
+        db_session.add_all(batch_decisions)
+        db_session.flush()
+
+        db_session.add_all(batch_diagnoses)
+        db_session.add_all(batch_gate_checks)
+        db_session.add_all(batch_actions)
+        db_session.flush()
+
+        if batch_outcomes:
+            db_session.add_all(batch_outcomes)
+            db_session.flush()
 
     recovery_rate = (recovered_count / n) if n > 0 else 0.0
     avg_time = (sum(resolution_times) / len(resolution_times)) if resolution_times else None

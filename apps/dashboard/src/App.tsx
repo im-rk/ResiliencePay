@@ -24,6 +24,24 @@ function Dashboard() {
   const [banditRunId, setBanditRunId] = useState(DEMO_BANDIT_RUN_ID);
   const { events, isConnected, setEvents } = useSimulationStream();
 
+  const loadCases = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/audit-trail?page=1&page_size=50`);
+      const data = await res.json();
+      const items = data ? (data.items || data.entries || []) : [];
+      if (items.length > 0) {
+        setEvents(items);
+        setSelectedEvent(items[0]);
+      }
+    } catch (err) {
+      console.error("Failed to load initial cases", err);
+    }
+  };
+
+  useEffect(() => {
+    loadCases();
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.shiftKey && e.key === 'S') {
@@ -77,7 +95,7 @@ function Dashboard() {
         </div>
         
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <DemoControls onRunStarted={setBanditRunId} />
+          <DemoControls onRunStarted={setBanditRunId} onRunCompleted={loadCases} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '24px', borderLeft: '1px solid var(--glass-border)' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Demo Admin</div>
