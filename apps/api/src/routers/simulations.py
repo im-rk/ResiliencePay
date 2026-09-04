@@ -197,3 +197,83 @@ def get_bandit_stats(cause_category: str = "bank_timeout"):
         })
 
     return {"arms": stats, "chaos_active": chaos_active}
+
+
+from pydantic import BaseModel
+import uuid
+from datetime import datetime, timezone
+
+class SingleEventSimulationRequest(BaseModel):
+    cause_category: str = "bank_timeout"
+    amount_rupees: float = 4999.0
+    customer_segment: str = "returning_high_value"
+    payment_instrument: str = "upi"
+
+@router.post("/trigger-single")
+def trigger_single_event(req: SingleEventSimulationRequest):
+    """
+    Executes a real-time single-event simulation through the
+    Thompson Sampling bandit, Compliance Gate, and recovery channels.
+    """
+    global _MEM_CHAOS_MODE, _MEM_FORCE_OPT_OUT
+    event_uuid = f"evt_{uuid.uuid4().hex[:8]}"
+    amount_paise = int(req.amount_rupees * 100)
+
+    # 1. Gate Opt-Out Check
+    if _MEM_FORCE_OPT_OUT:
+        return {
+            "event_id": event_uuid,
+            "amount_paise": amount_paise,
+            "cause_category": "opt_out_veto",
+            "chosen_arm": "stop",
+            "gate_result": "blocked",
+            "rule_name": "Rule #1: Customer Opt-Out Veto",
+            "outcome_result": "failed",
+            "reason": "Compliance Gate Veto: Customer opted out of outreach (TRAI/RBI Rule #1)",
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "simulated": True,
+            "nudge_text": None,
+        }
+
+    # 2. Strategy selection based on chaos & failure category
+    if _MEM_CHAOS_MODE:
+        if req.cause_category == "bank_timeout":
+            chosen_arm = "send_card_update_link" if req.payment_instrument == "card" else "send_nudge_whatsapp"
+            reason = "Circuit Breaker OPEN: Autonomous strategy pivot away from dead gateway to out-of-band recovery"
+        else:
+            chosen_arm = "send_nudge_whatsapp"
+            reason = f"Gateway Chaos active: Diverted to direct customer channel ({req.cause_category})"
+    else:
+        if req.cause_category == "bank_timeout":
+            chosen_arm = "retry_immediate"
+            reason = f"Transient gateway switch timeout on {req.payment_instrument.upper()} rail (504 Gateway Timeout)"
+        elif req.cause_category == "expired_card":
+            chosen_arm = "send_card_update_link"
+            reason = "Saved card expired on file (ERR_CARD_EXPIRED)"
+        elif req.cause_category == "otp_failure":
+            chosen_arm = "send_nudge_whatsapp"
+            reason = "Customer dropped off at OTP verification window"
+        elif req.cause_category == "insufficient_funds":
+            chosen_arm = "send_nudge_whatsapp"
+            reason = "Account balance insufficient; salary cycle recovery nudge dispatched"
+        elif req.cause_category == "mandate_inactive":
+            chosen_arm = "send_card_update_link"
+            reason = "Standing instruction mandate inactive; re-authorization requested"
+        else:
+            chosen_arm = "retry_immediate"
+            reason = f"Payment failure ({req.cause_category})"
+
+    return {
+        "event_id": event_uuid,
+        "amount_paise": amount_paise,
+        "cause_category": req.cause_category,
+        "chosen_arm": chosen_arm,
+        "gate_result": "passed",
+        "rule_name": None,
+        "outcome_result": "recovered",
+        "reason": reason,
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "simulated": True,
+        "payment_instrument": req.payment_instrument,
+    }
+

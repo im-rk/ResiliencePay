@@ -227,13 +227,19 @@ function Dashboard() {
 
         {/* SIMULATION VIEW */}
         {activeTab === 'simulation' && (
-          <div className="animate-fade-in" style={{ height: 'calc(100vh - 180px)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div className="glass-panel" style={{ width: '100%', maxWidth: '800px' }}>
+          <div className="animate-fade-in" style={{ height: 'calc(100vh - 180px)', overflowY: 'auto' }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
                <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                  <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Customer Simulation</h2>
-                 <p className="text-muted">Generate synthetic payment failures to test the recovery agent live.</p>
+                 <p className="text-muted">Generate synthetic payment failures to test the recovery agent live in real time.</p>
                </div>
-               <SimulationPanel event={selectedEvent} />
+               <SimulationPanel 
+                 event={selectedEvent} 
+                 onEventSimulated={(newEvent) => {
+                   setSelectedEvent(newEvent);
+                   setEvents((prev: any[]) => [newEvent, ...(Array.isArray(prev) ? prev : [])]);
+                 }}
+               />
             </div>
           </div>
         )}

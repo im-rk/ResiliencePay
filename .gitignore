@@ -1,6 +1,4 @@
 # Private and generated project content
-docs/
-**/docs/
 .env
 .venv/
 **/.venv/
