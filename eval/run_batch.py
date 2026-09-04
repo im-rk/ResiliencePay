@@ -158,6 +158,9 @@ def run_batch(
                 locale="en-IN",
                 created_at=draft["occurred_at"],
             )
+            db_session.add(customer)
+            db_session.flush()
+
             episode = Episode(
                 episode_id=draft["episode_id"],
                 merchant_id=merchant_uuid,
@@ -167,6 +170,9 @@ def run_batch(
                 currency="INR",
                 opened_at=draft["occurred_at"],
             )
+            db_session.add(episode)
+            db_session.flush()
+
             event = Event(
                 event_id=draft["event_id"],
                 episode_id=episode.episode_id,
@@ -181,6 +187,9 @@ def run_batch(
                     "occurred_at": draft["occurred_at"].isoformat(),
                 },
             )
+            db_session.add(event)
+            db_session.flush()
+
             decision = Decision(
                 decision_id=uuid.uuid4(),
                 event_id=event.event_id,
@@ -191,18 +200,24 @@ def run_batch(
                 beta_at_decision=choice.beta_at_decision,
                 decided_at=draft["occurred_at"],
             )
-            db_session.add_all([customer, episode, event, decision, Diagnosis(
+            db_session.add(decision)
+            db_session.flush()
+
+            db_session.add(Diagnosis(
                 event_id=event.event_id,
                 cause_category=diagnosis.cause_category.value,
                 confidence=diagnosis.confidence,
                 method=diagnosis.method,
                 created_at=draft["occurred_at"],
-            ), GateCheck(
+            ))
+            db_session.add(GateCheck(
                 decision_id=decision.decision_id,
                 result="passed" if gate_result.passed else "blocked",
                 rule_triggered=gate_result.rule_name,
                 checked_at=draft["occurred_at"],
-            )])
+            ))
+            db_session.flush()
+
             action = Action(
                 decision_id=decision.decision_id,
                 arm_name=choice.arm,

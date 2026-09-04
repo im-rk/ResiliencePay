@@ -21,6 +21,7 @@ type ViewTab = 'dashboard' | 'cases' | 'audit' | 'simulation';
 function Dashboard() {
   const [activeTab, setActiveTab] = useState<ViewTab>('dashboard');
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [banditRunId, setBanditRunId] = useState(DEMO_BANDIT_RUN_ID);
   const { events, isConnected, setEvents } = useSimulationStream();
 
   useEffect(() => {
@@ -75,7 +76,7 @@ function Dashboard() {
         </div>
         
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <DemoControls />
+          <DemoControls onRunStarted={setBanditRunId} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '24px', borderLeft: '1px solid var(--glass-border)' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Demo Admin</div>
@@ -99,7 +100,7 @@ function Dashboard() {
               <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Executive Overview</h2>
               <p className="text-muted">Real-time revenue recovery metrics and AI performance.</p>
             </div>
-            <MetricsSummary banditRunId={DEMO_BANDIT_RUN_ID} baselineRunId={DEMO_BASELINE_RUN_ID} />
+            <MetricsSummary banditRunId={banditRunId} baselineRunId={DEMO_BASELINE_RUN_ID} />
           </div>
         )}
 

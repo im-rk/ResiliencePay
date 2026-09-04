@@ -1,21 +1,34 @@
 import { useState } from "react";
 
-export function DemoControls() {
+export function DemoControls({ onRunStarted }: { onRunStarted?: (runId: string) => void }) {
   const [isRunning, setIsRunning] = useState(false);
   const [chaosEnabled, setChaosEnabled] = useState(false);
   const [chaosMessage, setChaosMessage] = useState("");
+  const [runMessage, setRunMessage] = useState("");
 
   const handleRunBatch = async () => {
     setIsRunning(true);
+    setRunMessage("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 120000);
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/simulations/run`, {
-        method: 'POST'
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/pipeline/run-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n_events: 300, policy: 'bandit', random_seed: Date.now() % 100000 }),
+        signal: controller.signal,
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json() as { run_id?: string; n_events?: number };
+      if (result.run_id) onRunStarted?.(result.run_id);
+      setRunMessage(`Simulation completed: ${result.n_events ?? 300} events processed.`);
     } catch (e) {
       console.error("Failed to trigger run", e);
+      setRunMessage(e instanceof DOMException && e.name === "AbortError" ? "Simulation timed out: check the backend." : "Simulation failed: check the backend.");
+    } finally {
+      window.clearTimeout(timeout);
+      setIsRunning(false);
     }
-    // Simulation spins up in the background
-    setTimeout(() => setIsRunning(false), 2000);
   };
 
   const handleInjectChaos = async () => {
@@ -42,6 +55,7 @@ export function DemoControls() {
       >
         {isRunning ? "Starting..." : "Run Batch Simulation (300)"}
       </button>
+      {runMessage && <span className="text-muted" style={{ fontSize: '11px' }}>{runMessage}</span>}
       {chaosMessage && <span className={chaosEnabled ? "text-danger" : "text-muted"} style={{ fontSize: '11px' }}>{chaosMessage}</span>}
 
       <button 

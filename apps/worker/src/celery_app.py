@@ -1,4 +1,5 @@
 import os
+import ssl
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
@@ -8,6 +9,10 @@ load_dotenv()
 redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 app = Celery("resiliencepay_worker", broker=redis_url, backend=redis_url)
+
+if redis_url.startswith("rediss://"):
+    app.conf.broker_use_ssl = {'ssl_cert_reqs': ssl.CERT_NONE}
+    app.conf.redis_backend_use_ssl = {'ssl_cert_reqs': ssl.CERT_NONE}
 
 # Twelve-factor disposability / graceful shutdown
 app.conf.worker_prefetch_multiplier = 1
