@@ -14,7 +14,13 @@ class AuditLogService:
 
     def __init__(self, db_session, redis_client=None):
         self.db_session = db_session
-        self.redis_client = redis_client
+        self.redis_client = None
+        if redis_client:
+            try:
+                redis_client.ping()
+                self.redis_client = redis_client
+            except Exception:
+                self.redis_client = None
 
     def _publish(self, payload: dict):
         if self.redis_client:
@@ -48,13 +54,23 @@ class AuditLogService:
             reward=getattr(outcome, "reward", None),
         ))
         self.db_session.commit()
+        amt_paise = None
+        if hasattr(event, "amount_paise"):
+            amt_paise = event.amount_paise
+        elif hasattr(event, "episode") and event.episode and hasattr(event.episode, "original_amount"):
+            amt_paise = event.episode.original_amount
+        elif hasattr(event, "raw_payload") and isinstance(event.raw_payload, dict):
+            amt_paise = event.raw_payload.get("amount")
+
         self._publish({
             "event_id": str(event_id) if event_id else None,
+            "episode_id": str(episode_id) if episode_id else None,
             "cause_category": cause_category,
             "chosen_arm": decision.chosen_arm if decision else None,
             "gate_result": "passed" if (gate_result and gate_result.passed) else ("blocked" if gate_result else None),
             "simulated": (decision.action.simulated if decision and getattr(decision, "action", None) else None),
             "outcome_result": outcome.result if outcome else None,
+            "amount_paise": amt_paise,
         })
 
     def write_batch(self, event_draft: dict, choice=None, gate_result=None, outcome=None, reward: float | None = None):
@@ -62,22 +78,28 @@ class AuditLogService:
         outcome_res = getattr(outcome, "result", None) if outcome else None
         reward_val = reward if reward is not None else getattr(outcome, "reward", None)
 
+        rule_name = getattr(gate_result, "rule_name", None) if gate_result else None
+
         self.db_session.add(AuditLog(
             event_id=event_draft.get("event_id"),
             episode_id=event_draft.get("episode_id"),
             cause_category=event_draft.get("cause_category"),
             chosen_arm=getattr(choice, "arm", None) if choice else None,
             gate_result="passed" if (gate_result and gate_result.passed) else ("blocked" if gate_result else None),
+            error_code=rule_name if (gate_result and not gate_result.passed) else None,
             simulated=True,
             outcome_result=outcome_res,
             reward=reward_val,
         ))
-        # Don't commit for batch (usually committed en masse), but we can publish for the live feed if needed.
+        # Publish to live SSE stream
         self._publish({
             "event_id": str(event_draft.get("event_id")),
+            "episode_id": str(event_draft.get("episode_id")),
             "cause_category": event_draft.get("cause_category"),
             "chosen_arm": getattr(choice, "arm", None) if choice else None,
             "gate_result": "passed" if (gate_result and gate_result.passed) else ("blocked" if gate_result else None),
+            "rule_name": rule_name,
+            "error_code": rule_name if (gate_result and not gate_result.passed) else None,
             "simulated": True,
             "outcome_result": outcome_res,
             "amount_paise": event_draft.get("amount"),

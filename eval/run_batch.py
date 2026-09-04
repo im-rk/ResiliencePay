@@ -56,11 +56,14 @@ def context_bucket_for_draft(draft: dict, diagnosis: DiagnosisResult) -> str:
     return context_bucket_for(DraftWrapper(draft), diagnosis)
 
 
-def evaluate_gate_for_draft(draft: dict, chosen_arm: str) -> GateResult:
+def evaluate_gate_for_draft(draft: dict, chosen_arm: str, force_opt_out: bool = False) -> GateResult:
     """Evaluates compliance gate rules for a synthetic event draft."""
     if chosen_arm == "stop":
         return GateResult(passed=True, reason="do_nothing_allowed", rule_name="stop_arm")
-    if draft.get("opted_out", False):
+    
+    is_opted_out = draft.get("opted_out", False) or force_opt_out
+
+    if is_opted_out:
         return GateResult(passed=False, reason="customer_opted_out", rule_name="opt_out")
     if draft.get("retry_count_so_far", 0) >= 3:
         return GateResult(passed=False, reason="max_attempts_exceeded", rule_name="max_attempts")
@@ -129,6 +132,18 @@ def run_batch(
 
     raw_drafts = generate_batch(seed=dataset_seed, n=n, merchant_id=merchant_id or "merch_demo01")
 
+    force_opt_out = False
+    chaos_active = False
+    try:
+        opt_flag = redis_client.get("simulation:force_opt_out")
+        if opt_flag and opt_flag in (b"1", "1"):
+            force_opt_out = True
+        chaos_val = redis_client.get("circuit_breaker:chaos_mode")
+        if chaos_val and chaos_val in (b"1", "1"):
+            chaos_active = True
+    except Exception:
+        pass
+
     exception_count = 0
     gate_blocked_count = 0
     amount_recovered_total = 0
@@ -146,7 +161,7 @@ def run_batch(
         context_bucket = context_bucket_for_draft(draft, diagnosis)
 
         choice = policy.sample_arm(merchant_id or "merch_demo01", context_bucket)
-        gate_result = evaluate_gate_for_draft(draft, choice.arm)
+        gate_result = evaluate_gate_for_draft(draft, choice.arm, force_opt_out=force_opt_out)
 
         if db_session:
             customer_uuid = uuid.uuid5(uuid.NAMESPACE_URL, f"resiliencepay:customer:{draft['event_id']}")
@@ -195,7 +210,12 @@ def run_batch(
                 decided_at=draft["occurred_at"],
             )
             
-            db_session.add_all([customer, episode, event, decision])
+            db_session.add(customer)
+            db_session.add(episode)
+            db_session.add(event)
+            db_session.flush()
+
+            db_session.add(decision)
             db_session.flush()
 
             db_session.add_all([
@@ -224,11 +244,9 @@ def run_batch(
             )
             db_session.add(action)
             db_session.flush()
-            
-        amount_at_risk_total += draft.get("amount", 0)
 
         if gate_result.passed:
-            sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng)
+            sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng, chaos_active=chaos_active)
             reward = reward_service.compute(sim_outcome)
             policy.update(merchant_id or "merch_demo01", context_bucket, choice.arm, reward)
             if sim_outcome.result == "recovered":

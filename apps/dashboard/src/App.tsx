@@ -31,8 +31,9 @@ function Dashboard() {
         try {
           const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/audit-trail?page=1&size=300`);
           const data = await res.json();
-          if (data && data.entries) {
-            setEvents(data.entries);
+          const items = data ? (data.items || data.entries || []) : [];
+          if (items.length > 0) {
+            setEvents(items);
             alert("Stage Safety Net: Cached run loaded successfully.");
           }
         } catch (err) {

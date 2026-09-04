@@ -84,12 +84,26 @@ def inject_chaos():
     to simulate upstream 5xx errors.
     """
     current_chaos = redis_client.get("circuit_breaker:chaos_mode")
-    if current_chaos and current_chaos == b"1":
+    if current_chaos and current_chaos in (b"1", "1"):
         redis_client.set("circuit_breaker:chaos_mode", "0")
         return {"status": "chaos_disabled"}
     else:
         redis_client.set("circuit_breaker:chaos_mode", "1")
         return {"status": "chaos_enabled"}
+
+@router.post("/opt-out")
+def toggle_opt_out():
+    """
+    Toggles the simulation force opt-out flag in Redis to demonstrate
+    Compliance Gate vetoing recovery attempts.
+    """
+    current = redis_client.get("simulation:force_opt_out")
+    if current and current in (b"1", "1"):
+        redis_client.set("simulation:force_opt_out", "0")
+        return {"status": "opt_out_disabled"}
+    else:
+        redis_client.set("simulation:force_opt_out", "1")
+        return {"status": "opt_out_enabled"}
 
 @router.get("/bandit-stats")
 def get_bandit_stats(cause_category: str):

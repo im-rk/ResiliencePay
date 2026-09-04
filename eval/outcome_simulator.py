@@ -41,14 +41,25 @@ ARM_MATCH_QUALITY: dict[str, dict[str, float]] = {
 DEFAULT_MATCH_QUALITY = 0.20
 
 
-def simulate_outcome(event_draft: dict, chosen_arm: str, rng: np.random.Generator) -> SimulatedOutcome:
+def simulate_outcome(event_draft: dict, chosen_arm: str, rng: np.random.Generator, chaos_active: bool | None = None) -> SimulatedOutcome:
     """Simulates the outcome of executing chosen_arm on event_draft.
     The 'stop' arm represents deliberate non-action and NEVER recovers money."""
     base_prob = event_draft.get("_ground_truth_recoverable_prob", 0.5)
     cause = event_draft.get("cause_category", "unknown")
     match_quality = ARM_MATCH_QUALITY.get(cause, {}).get(chosen_arm, DEFAULT_MATCH_QUALITY)
 
+    if chaos_active is None:
+        try:
+            from packages.config.redis_client import redis_client
+            val = redis_client.get("circuit_breaker:chaos_mode")
+            chaos_active = bool(val and val in (b"1", "1"))
+        except Exception:
+            chaos_active = False
+
     if chosen_arm == "stop" or match_quality <= 0.0:
+        recovered = False
+    elif chaos_active and chosen_arm.startswith("retry"):
+        # Gateway blackout! Upstream 5xx/timeouts cause naive retries to fail
         recovered = False
     else:
         final_prob = min(base_prob * match_quality * 1.15, 1.0)

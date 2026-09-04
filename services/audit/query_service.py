@@ -42,7 +42,7 @@ def query_audit_trail(
     page_size: int = 50,
 ) -> dict:
     """Queries audit log table with filtering and pagination."""
-    query = db_session.query(AuditLog, Episode.original_amount).join(
+    query = db_session.query(AuditLog, Episode.original_amount).outerjoin(
         Episode, AuditLog.episode_id == Episode.episode_id
     )
 
@@ -65,23 +65,27 @@ def query_audit_trail(
     except Exception:
         return {"items": [], "total": 0, "page": page, "page_size": page_size}
 
+    res_items = [
+        {
+            "audit_id": item.audit_id,
+            "event_id": str(item.event_id) if item.event_id else None,
+            "episode_id": str(item.episode_id) if item.episode_id else None,
+            "cause_category": item.cause_category,
+            "chosen_arm": item.chosen_arm,
+            "gate_result": item.gate_result,
+            "rule_name": item.error_code if item.gate_result == "blocked" else None,
+            "simulated": item.simulated,
+            "outcome_result": item.outcome_result,
+            "reward": float(item.reward) if item.reward is not None else None,
+            "recorded_at": item.recorded_at.isoformat() if item.recorded_at else None,
+            "amount_paise": original_amount,
+        }
+        for (item, original_amount) in items_and_amounts
+    ]
+
     return {
-        "items": [
-            {
-                "audit_id": item.audit_id,
-                "event_id": str(item.event_id) if item.event_id else None,
-                "episode_id": str(item.episode_id) if item.episode_id else None,
-                "cause_category": item.cause_category,
-                "chosen_arm": item.chosen_arm,
-                "gate_result": item.gate_result,
-                "simulated": item.simulated,
-                "outcome_result": item.outcome_result,
-                "reward": float(item.reward) if item.reward is not None else None,
-                "recorded_at": item.recorded_at.isoformat() if item.recorded_at else None,
-                "amount_paise": original_amount,
-            }
-            for (item, original_amount) in items_and_amounts
-        ],
+        "items": res_items,
+        "entries": res_items,
         "total": total,
         "page": page,
         "page_size": page_size,

@@ -41,7 +41,23 @@ export function DemoControls({ onRunStarted }: { onRunStarted?: (runId: string) 
       setChaosMessage(data.status === "chaos_enabled" ? "Chaos mode enabled" : "Chaos mode disabled");
     } catch (e) {
       console.error("Failed to inject chaos", e);
-      setChaosMessage("Chaos mode unavailable: check Redis");
+    }
+  };
+
+  const [optOutEnabled, setOptOutEnabled] = useState(false);
+  const [optOutMessage, setOptOutMessage] = useState("");
+
+  const handleOptOut = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/v1/simulations/opt-out`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      setOptOutEnabled(data.status === "opt_out_enabled");
+      setOptOutMessage(data.status === "opt_out_enabled" ? "Opt-Out active (Gate will block nudges)" : "Opt-Out disabled");
+    } catch (e) {
+      console.error("Failed to toggle opt-out", e);
+      setOptOutMessage("Opt-out toggle unavailable: check API");
     }
   };
 
@@ -57,6 +73,7 @@ export function DemoControls({ onRunStarted }: { onRunStarted?: (runId: string) 
       </button>
       {runMessage && <span className="text-muted" style={{ fontSize: '11px' }}>{runMessage}</span>}
       {chaosMessage && <span className={chaosEnabled ? "text-danger" : "text-muted"} style={{ fontSize: '11px' }}>{chaosMessage}</span>}
+      {optOutMessage && <span className={optOutEnabled ? "text-warning" : "text-muted"} style={{ fontSize: '11px' }}>{optOutMessage}</span>}
 
       <button 
         className="btn-primary" 
@@ -78,12 +95,14 @@ export function DemoControls({ onRunStarted }: { onRunStarted?: (runId: string) 
           padding: '8px 16px', 
           fontSize: '14px', 
           width: 'auto',
-          background: 'rgba(255,255,255,0.1)',
+          background: optOutEnabled ? '#f59e0b' : 'rgba(255,255,255,0.1)',
+          color: optOutEnabled ? '#000' : '#fff',
+          fontWeight: optOutEnabled ? 700 : 500,
           border: '1px solid var(--glass-border)'
         }}
-        onClick={() => alert("Simulating customer opt-out webhook...")}
+        onClick={handleOptOut}
       >
-        Simulate Opt-Out
+        {optOutEnabled ? "Clear Opt-Out" : "Simulate Opt-Out"}
       </button>
     </div>
   );

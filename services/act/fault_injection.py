@@ -19,8 +19,18 @@ def with_fault_injection(fn):
     nearly free."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if getattr(settings, "fault_injection_enabled", False):
-            if random.random() < getattr(settings, "fault_injection_rate", 0.0):
+        chaos_active = False
+        try:
+            from packages.config.redis_client import redis_client
+            chaos_val = redis_client.get("circuit_breaker:chaos_mode")
+            if chaos_val and (chaos_val == b"1" or chaos_val == "1"):
+                chaos_active = True
+        except Exception:
+            pass
+
+        if chaos_active or getattr(settings, "fault_injection_enabled", False):
+            rate = 0.60 if chaos_active else getattr(settings, "fault_injection_rate", 0.0)
+            if random.random() < rate:
                 fault_type = random.choice(FAULT_TYPES)
                 raise SimulatedFault(fault_type)
         return fn(*args, **kwargs)

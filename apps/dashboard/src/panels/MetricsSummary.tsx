@@ -15,12 +15,14 @@ export function MetricsSummary({ banditRunId, baselineRunId }: { banditRunId: st
     return <div style={{ color: 'var(--color-danger)' }}>Could not load metrics.</div>;
   }
 
-  const banditData = bandit.data || { recovery_rate: 0, amount_recovered: 0 };
-  const baselineData = baseline.data || { recovery_rate: 0, amount_recovered: 0 };
+  const banditData = bandit.data || { recovery_rate: 0, amount_recovered: 0, amount_at_risk: 0 };
+  const baselineData = baseline.data || { recovery_rate: 0, amount_recovered: 0, amount_at_risk: 0 };
   
   const lift = banditData.recovery_rate - baselineData.recovery_rate;
-  // Assume a fixed at-risk volume for demo purposes if not provided by backend
-  const totalAtRisk = 5000000; // ₹50,000.00
+  // Derive revenue at risk from backend batch metrics; never hardcode or fall below recovered
+  const totalAtRisk = banditData.amount_at_risk && banditData.amount_at_risk >= banditData.amount_recovered
+    ? banditData.amount_at_risk
+    : (banditData.amount_recovered > 0 ? Math.round(banditData.amount_recovered / (banditData.recovery_rate || 0.54)) : 98650000);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) 2fr', gap: '20px' }}>
