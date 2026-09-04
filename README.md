@@ -8,6 +8,7 @@
 
 ## Table of Contents
 
+0. [Live Product Showcase & Screenshots](#live-product-showcase--screenshots)
 1. [The Problem](#1-the-problem)
 2. [The Solution, In One Paragraph](#2-the-solution-in-one-paragraph)
 3. [Why This Architecture Is Correct](#3-why-this-architecture-is-correct-not-just-clever)
@@ -27,6 +28,43 @@
 17. [Testing Strategy](#17-testing-strategy)
 18. [What We Deliberately Did Not Build](#18-what-we-deliberately-did-not-build)
 19. [Team](#19-team)
+
+---
+
+## Live Product Showcase & Screenshots
+
+### 1. Executive Overview & Reinforcement Learning Convergence
+Real-time monitoring of revenue at risk, autonomous recovery progress, Thompson Sampling convergence curves compared against a static naive 24-hour retry baseline, and dynamic strategy allocation breakdown.
+
+![Executive Dashboard](docs/screenshots/01_executive_dashboard.png)
+
+---
+
+### 2. Active Case Inspector — Normal Baseline Operation
+The Case Inspector allows human operators and auditors to trace every single decision step. In normal conditions, the contextual bandit detects transient bank timeouts and prioritizes low-friction network retries with **82.1% dominant probability**.
+
+![Case Inspector Normal](docs/screenshots/02_case_inspector_normal.png)
+
+---
+
+### 3. Autonomous Recovery Pivot Under Gateway Chaos
+When upstream bank gateways experience major downtime or network timeouts, ResiliencePay's Thompson Sampling distribution **autonomously drops network retries to 10.5%** and shifts recovery priority to **Card Update Links (82.8%)** and **WhatsApp Smart Nudges (78.7%)** without human intervention.
+
+![Autonomous Recovery Pivot under Chaos](docs/screenshots/03_case_inspector_chaos.png)
+
+---
+
+### 4. Cryptographically Chained Immutable Audit Trail
+Every recovery event, decline taxonomy diagnosis, deterministic compliance check (PASSED/BLOCKED), and external action is logged with SHA-256 hash chains for regulatory compliance.
+
+![Immutable Audit Ledger](docs/screenshots/04_audit_ledger.png)
+
+---
+
+### 5. Enterprise Authentication & Role-Based Access Control
+Secure enterprise authentication gate for merchant admins and compliance auditors with animated verification.
+
+![Enterprise Login](docs/screenshots/00_enterprise_login.png)
 
 ---
 

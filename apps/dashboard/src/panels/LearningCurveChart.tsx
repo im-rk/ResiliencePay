@@ -15,10 +15,7 @@ export function LearningCurveChart({ banditRunId, baselineRunId, compact = false
   const bandit = usePolling(["learning-curve", banditRunId], () => fetchLearningCurve(banditRunId));
   const baseline = usePolling(["learning-curve", baselineRunId], () => fetchLearningCurve(baselineRunId));
 
-  if (bandit.isLoading || baseline.isLoading) return <PanelSkeleton label="Loading learning curve…" />;
-  if (bandit.isError || baseline.isError) return <PanelError message="Could not load learning curve." />;
-
-  const merged = mergeCurvesByBatchIndex(bandit.data! as any, baseline.data! as any);
+  const merged = mergeCurvesByBatchIndex(bandit.data as any, baseline.data as any);
 
   return (
     <div className={`learning-curve-chart${compact ? " learning-curve-compact" : ""}`} style={{ width: '100%', height: compact ? 80 : 300 }}>

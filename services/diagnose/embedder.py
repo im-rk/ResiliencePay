@@ -1,10 +1,12 @@
-import google.generativeai as genai
-from packages.config.settings import settings
+try:
+    import google.generativeai as genai
+    from packages.config.settings import settings
+    genai.configure(api_key=settings.gemini_api_key)
+except (ImportError, OSError, Exception):
+    genai = None
+
 import structlog
 import typing
-
-logger = structlog.get_logger(__name__)
-genai.configure(api_key=settings.gemini_api_key)
 
 def embed_text(text: str) -> typing.List[float]:
     """Generates a 768-dimensional embedding for the given text using Gemini."""

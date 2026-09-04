@@ -14,11 +14,14 @@ TEMPLATE_FALLBACKS = {
     "send_card_update_link": "Your card on file needs updating. Update it here: {link}",
 }
 
-import google.generativeai as genai
-from packages.config.settings import settings
-
-genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
+try:
+    import google.generativeai as genai
+    from packages.config.settings import settings
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+except (ImportError, OSError, Exception):
+    genai = None
+    model = None
 
 class NudgeGenerator:
     def __init__(self, llm_client=None, timeout_seconds: float = 5.0):

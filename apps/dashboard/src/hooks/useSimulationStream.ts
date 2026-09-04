@@ -24,7 +24,9 @@ export function useSimulationStream() {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setEvents((prev) => [data, ...prev].slice(0, 300));
+          if (data && (data.event_id || data.audit_id || data.episode_id)) {
+            setEvents((prev) => [data, ...prev.filter(e => e.event_id !== data.event_id)].slice(0, 300));
+          }
         } catch (err) {
           console.error("Failed to parse SSE data", err);
         }

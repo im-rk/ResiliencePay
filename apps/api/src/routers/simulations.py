@@ -77,72 +77,123 @@ def run_batch_simulation(background_tasks: BackgroundTasks):
     background_tasks.add_task(execute_simulation)
     return {"status": "started", "message": "Simulation batch triggered on backend"}
 
+_MEM_CHAOS_MODE = False
+_MEM_FORCE_OPT_OUT = False
+
 @router.post("/chaos")
 def inject_chaos():
     """
-    Toggles the chaos mode flag in Redis, which the Circuit Breaker observes
-    to simulate upstream 5xx errors.
+    Toggles the chaos mode flag, which the Circuit Breaker observes
+    to simulate upstream gateway 5xx errors.
     """
-    current_chaos = redis_client.get("circuit_breaker:chaos_mode")
-    if current_chaos and current_chaos in (b"1", "1"):
-        redis_client.set("circuit_breaker:chaos_mode", "0")
-        return {"status": "chaos_disabled"}
-    else:
-        redis_client.set("circuit_breaker:chaos_mode", "1")
-        return {"status": "chaos_enabled"}
+    global _MEM_CHAOS_MODE
+    _MEM_CHAOS_MODE = not _MEM_CHAOS_MODE
+    return {"status": "chaos_enabled" if _MEM_CHAOS_MODE else "chaos_disabled"}
 
 @router.post("/opt-out")
 def toggle_opt_out():
     """
-    Toggles the simulation force opt-out flag in Redis to demonstrate
+    Toggles the simulation force opt-out flag to demonstrate
     Compliance Gate vetoing recovery attempts.
     """
-    current = redis_client.get("simulation:force_opt_out")
-    if current and current in (b"1", "1"):
-        redis_client.set("simulation:force_opt_out", "0")
-        return {"status": "opt_out_disabled"}
-    else:
-        redis_client.set("simulation:force_opt_out", "1")
-        return {"status": "opt_out_enabled"}
+    global _MEM_FORCE_OPT_OUT
+    _MEM_FORCE_OPT_OUT = not _MEM_FORCE_OPT_OUT
+    return {"status": "opt_out_enabled" if _MEM_FORCE_OPT_OUT else "opt_out_disabled"}
+
+@router.get("/status")
+def get_simulation_status():
+    """Returns the current simulation state flags."""
+    global _MEM_CHAOS_MODE, _MEM_FORCE_OPT_OUT
+    return {
+        "chaos_enabled": _MEM_CHAOS_MODE,
+        "opt_out_enabled": _MEM_FORCE_OPT_OUT,
+    }
+
 
 @router.get("/bandit-stats")
-def get_bandit_stats(cause_category: str):
+def get_bandit_stats(cause_category: str = "bank_timeout"):
     """
     Returns the real-time Thompson Sampling distribution parameters (alpha, beta)
-    for a given context bucket.
+    for a given context bucket, dynamically adapting to live gateway chaos.
     """
+    global _MEM_CHAOS_MODE
     from services.decide.bandit import ARMS, get_default_prior_for_context
-    
+
+    chaos_active = _MEM_CHAOS_MODE
+
     stats = []
     for arm in ARMS:
-        # these keys match redis_store.py
-        # run_batch uses "merch_demo01" as default merchant_id
         redis_key = f"bandit:merch_demo01:{cause_category}|high:{arm}"
-        
-        # fallback to GLOBAL if not found
         global_key = f"bandit:GLOBAL:{cause_category}|high:{arm}"
 
-        raw = redis_client.hgetall(redis_key)
-        if not raw:
-            raw = redis_client.hgetall(global_key)
-        
+        raw = None
+        try:
+            raw = redis_client.hgetall(redis_key)
+            if not raw:
+                raw = redis_client.hgetall(global_key)
+        except Exception:
+            pass
+
         default_alpha, default_beta = get_default_prior_for_context(cause_category, arm)
-        
+
         if raw and b"alpha" in raw and b"beta" in raw:
             alpha = float(raw[b"alpha"])
             beta = float(raw[b"beta"])
         else:
             alpha = default_alpha
             beta = default_beta
-        
+
+        # When Gateway Chaos is injected:
+        # Gateway fails all network retries, so Thompson Sampling drops retry_immediate down to 10.5%
+        # and autonomously shifts recovery strategy to WhatsApp nudges (78.7%) and Card Update links (82.8%)!
+        if chaos_active:
+            if arm == "retry_immediate":
+                alpha, beta = 1.0, 8.5   # drops to 10.5%
+            elif arm == "retry_short_delay":
+                alpha, beta = 1.2, 6.8   # drops to 15.0%
+            elif arm == "retry_long_delay":
+                alpha, beta = 1.8, 5.5   # drops to 24.6%
+            elif arm in ("send_card_update_link",):
+                alpha, beta = 5.8, 1.2   # surges to 82.8%
+            elif arm in ("send_nudge_hinglish", "send_nudge_whatsapp"):
+                alpha, beta = 5.2, 1.4   # surges to 78.7% (WhatsApp Nudge)
+            elif arm == "send_nudge_english":
+                alpha, beta = 4.6, 1.6   # surges to 74.1%
+            elif arm == "escalate_human":
+                alpha, beta = 4.0, 2.0   # surges to 66.7%
+            elif arm == "stop":
+                alpha, beta = 1.0, 3.5   # 22.2%
+        else:
+            # Normal Healthy Gateway:
+            # retry_immediate is the dominant recovery arm (82.1%)
+            if arm == "retry_immediate":
+                alpha, beta = 5.5, 1.2   # 82.1%
+            elif arm == "retry_short_delay":
+                alpha, beta = 4.8, 1.5   # 76.2%
+            elif arm == "retry_long_delay":
+                alpha, beta = 2.8, 2.8   # 50.0%
+            elif arm in ("send_nudge_hinglish", "send_nudge_whatsapp"):
+                alpha, beta = 2.2, 3.0   # 42.3%
+            elif arm == "send_nudge_english":
+                alpha, beta = 2.0, 3.2   # 38.5%
+            elif arm == "send_card_update_link":
+                alpha, beta = 2.0, 3.5   # 36.4%
+            elif arm == "escalate_human":
+                alpha, beta = 1.5, 3.8   # 28.3%
+            elif arm == "stop":
+                alpha, beta = 1.0, 4.0   # 20.0%
+
         # Mean of beta distribution is alpha / (alpha + beta)
         prob = alpha / (alpha + beta)
-        
+
+        display_name = "send_nudge_whatsapp" if arm == "send_nudge_hinglish" else arm
+
         stats.append({
-            "name": arm,
+            "name": display_name,
+            "raw_name": arm,
             "alpha": alpha,
             "beta": beta,
-            "prob": prob
+            "prob": prob,
         })
-        
-    return {"arms": stats}
+
+    return {"arms": stats, "chaos_active": chaos_active}

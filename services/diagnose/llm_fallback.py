@@ -1,17 +1,16 @@
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    from packages.config.settings import settings
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+except (ImportError, OSError, Exception):
+    genai = None
+    model = None
+
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from packages.domain_constants.cause_categories import CauseCategoryEnum
 from services.diagnose.schemas import DiagnosisResult
 from pydantic import BaseModel, ValidationError, Field
-from packages.config.settings import settings
-
-class LLMOutputSchema(BaseModel):
-    cause_category: CauseCategoryEnum
-    confidence: float = Field(ge=0.0, le=1.0)
-    justification: str
-
-genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 
 class _GeminiMessages:

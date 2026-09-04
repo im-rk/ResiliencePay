@@ -1,13 +1,15 @@
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    from packages.config.settings import settings
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+except (ImportError, OSError, Exception):
+    genai = None
+    model = None
+
 from datetime import date
-from packages.config.settings import settings
 from services.observe.schemas import PTPExtractionSchema, PTPExtractionResult
 import structlog
-
-logger = structlog.get_logger(__name__)
-
-genai.configure(api_key=settings.gemini_api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 PTP_EXTRACTION_PROMPT = """\
 A customer replied to a payment reminder. Determine if they committed to a

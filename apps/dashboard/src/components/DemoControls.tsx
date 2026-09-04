@@ -44,8 +44,10 @@ export function DemoControls({
         method: 'POST'
       });
       const data = await res.json();
-      setChaosEnabled(data.status === "chaos_enabled");
-      setChaosMessage(data.status === "chaos_enabled" ? "Chaos mode enabled" : "Chaos mode disabled");
+      const enabled = data.status === "chaos_enabled";
+      setChaosEnabled(enabled);
+      setChaosMessage(enabled ? "Chaos mode enabled" : "Chaos mode disabled");
+      window.dispatchEvent(new CustomEvent("chaos_mode_changed", { detail: { chaosActive: enabled } }));
     } catch (e) {
       console.error("Failed to inject chaos", e);
     }

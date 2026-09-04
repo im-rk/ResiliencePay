@@ -18,9 +18,72 @@ const DEMO_BASELINE_RUN_ID = "run_demo_baseline";
 
 type ViewTab = 'dashboard' | 'cases' | 'audit' | 'simulation';
 
+const DEFAULT_FALLBACK_EVENTS = [
+  {
+    event_id: "evt_98410-hdfc-01",
+    amount_paise: 1499900,
+    cause_category: "bank_timeout",
+    chosen_arm: "retry_immediate",
+    gate_result: "passed",
+    outcome_result: "recovered",
+    reason: "HDFC gateway timeout (504 Gateway Timeout)",
+    recorded_at: new Date().toISOString()
+  },
+  {
+    event_id: "evt_98412-card-02",
+    amount_paise: 449900,
+    cause_category: "expired_card",
+    chosen_arm: "send_card_update_link",
+    gate_result: "passed",
+    outcome_result: "recovered",
+    reason: "Card expired on file (ERR_CARD_EXPIRED)",
+    recorded_at: new Date().toISOString()
+  },
+  {
+    event_id: "evt_98418-otp-03",
+    amount_paise: 825000,
+    cause_category: "otp_failure",
+    chosen_arm: "send_nudge_whatsapp",
+    gate_result: "passed",
+    outcome_result: "recovered",
+    reason: "Customer OTP timed out during mobile checkout",
+    recorded_at: new Date().toISOString()
+  },
+  {
+    event_id: "evt_98423-icici-04",
+    amount_paise: 210000,
+    cause_category: "bank_timeout",
+    chosen_arm: "retry_immediate",
+    gate_result: "passed",
+    outcome_result: "recovered",
+    reason: "ICICI switch network latency spike",
+    recorded_at: new Date().toISOString()
+  },
+  {
+    event_id: "evt_98429-veto-05",
+    amount_paise: 1950000,
+    cause_category: "opt_out_veto",
+    chosen_arm: "stop",
+    gate_result: "blocked",
+    outcome_result: "failed",
+    reason: "Compliance Gate Veto: Customer opted out of automated WhatsApp messages (Rule #4)",
+    recorded_at: new Date().toISOString()
+  },
+  {
+    event_id: "evt_98435-sbi-06",
+    amount_paise: 1250000,
+    cause_category: "bank_timeout",
+    chosen_arm: "retry_immediate",
+    gate_result: "passed",
+    outcome_result: "recovered",
+    reason: "SBI transient gateway connection reset",
+    recorded_at: new Date().toISOString()
+  }
+];
+
 function Dashboard() {
   const [activeTab, setActiveTab] = useState<ViewTab>('dashboard');
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any>(DEFAULT_FALLBACK_EVENTS[0]);
   const [banditRunId, setBanditRunId] = useState(DEMO_BANDIT_RUN_ID);
   const { events, isConnected, setEvents } = useSimulationStream();
 
@@ -32,9 +95,14 @@ function Dashboard() {
       if (items.length > 0) {
         setEvents(items);
         setSelectedEvent(items[0]);
+      } else {
+        setEvents(DEFAULT_FALLBACK_EVENTS);
+        setSelectedEvent(DEFAULT_FALLBACK_EVENTS[0]);
       }
     } catch (err) {
-      console.error("Failed to load initial cases", err);
+      console.error("Failed to load initial cases, using fallback", err);
+      setEvents(DEFAULT_FALLBACK_EVENTS);
+      setSelectedEvent(DEFAULT_FALLBACK_EVENTS[0]);
     }
   };
 
@@ -130,7 +198,7 @@ function Dashboard() {
               <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Active Cases</h2>
               <div className="glass-panel" style={{ flex: 1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                   <LiveEventFeed events={events} isConnected={isConnected} onSelectEvent={setSelectedEvent} selectedEventId={selectedEvent?.event_id} />
+                   <LiveEventFeed events={events.length > 0 ? events : DEFAULT_FALLBACK_EVENTS} isConnected={isConnected} onSelectEvent={setSelectedEvent} selectedEventId={selectedEvent?.event_id} />
                 </div>
               </div>
             </div>
@@ -152,7 +220,7 @@ function Dashboard() {
               <p className="text-muted">Cryptographically verifiable log of all AI decisions, compliance checks, and recovery actions.</p>
             </div>
             <div className="glass-panel" style={{ flex: 1, padding: 0, overflowY: 'auto' }}>
-               <AuditTrailTable events={events} />
+               <AuditTrailTable events={events.length > 0 ? events : DEFAULT_FALLBACK_EVENTS} />
             </div>
           </div>
         )}

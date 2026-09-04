@@ -1,4 +1,8 @@
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except (ImportError, OSError):
+    genai = None
+
 from packages.config.settings import settings
 from dataclasses import dataclass
 
