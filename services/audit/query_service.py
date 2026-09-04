@@ -42,7 +42,9 @@ def query_audit_trail(
     page_size: int = 50,
 ) -> dict:
     """Queries audit log table with filtering and pagination."""
-    query = db_session.query(AuditLog)
+    query = db_session.query(AuditLog, Episode.original_amount).join(
+        Episode, AuditLog.episode_id == Episode.episode_id
+    )
 
     if episode_id:
         try:
@@ -59,7 +61,7 @@ def query_audit_trail(
     try:
         total = query.count()
         offset = max(0, (page - 1) * page_size)
-        items = query.order_by(AuditLog.recorded_at.desc()).offset(offset).limit(page_size).all()
+        items_and_amounts = query.order_by(AuditLog.recorded_at.desc()).offset(offset).limit(page_size).all()
     except Exception:
         return {"items": [], "total": 0, "page": page, "page_size": page_size}
 
@@ -76,8 +78,9 @@ def query_audit_trail(
                 "outcome_result": item.outcome_result,
                 "reward": float(item.reward) if item.reward is not None else None,
                 "recorded_at": item.recorded_at.isoformat() if item.recorded_at else None,
+                "amount_paise": original_amount,
             }
-            for item in items
+            for (item, original_amount) in items_and_amounts
         ],
         "total": total,
         "page": page,

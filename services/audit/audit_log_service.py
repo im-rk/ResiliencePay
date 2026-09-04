@@ -80,6 +80,7 @@ class AuditLogService:
             "gate_result": "passed" if (gate_result and gate_result.passed) else ("blocked" if gate_result else None),
             "simulated": True,
             "outcome_result": outcome_res,
+            "amount_paise": event_draft.get("amount"),
         })
 
     def write_error(self, decision, code: str, reason: str):

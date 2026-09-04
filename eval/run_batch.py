@@ -158,8 +158,6 @@ def run_batch(
                 locale="en-IN",
                 created_at=draft["occurred_at"],
             )
-            db_session.add(customer)
-            db_session.flush()
 
             episode = Episode(
                 episode_id=draft["episode_id"],
@@ -170,8 +168,6 @@ def run_batch(
                 currency="INR",
                 opened_at=draft["occurred_at"],
             )
-            db_session.add(episode)
-            db_session.flush()
 
             event = Event(
                 event_id=draft["event_id"],
@@ -187,8 +183,6 @@ def run_batch(
                     "occurred_at": draft["occurred_at"].isoformat(),
                 },
             )
-            db_session.add(event)
-            db_session.flush()
 
             decision = Decision(
                 decision_id=uuid.uuid4(),
@@ -200,22 +194,25 @@ def run_batch(
                 beta_at_decision=choice.beta_at_decision,
                 decided_at=draft["occurred_at"],
             )
-            db_session.add(decision)
+            
+            db_session.add_all([customer, episode, event, decision])
             db_session.flush()
 
-            db_session.add(Diagnosis(
-                event_id=event.event_id,
-                cause_category=diagnosis.cause_category.value,
-                confidence=diagnosis.confidence,
-                method=diagnosis.method,
-                created_at=draft["occurred_at"],
-            ))
-            db_session.add(GateCheck(
-                decision_id=decision.decision_id,
-                result="passed" if gate_result.passed else "blocked",
-                rule_triggered=gate_result.rule_name,
-                checked_at=draft["occurred_at"],
-            ))
+            db_session.add_all([
+                Diagnosis(
+                    event_id=event.event_id,
+                    cause_category=diagnosis.cause_category.value,
+                    confidence=diagnosis.confidence,
+                    method=diagnosis.method,
+                    created_at=draft["occurred_at"],
+                ),
+                GateCheck(
+                    decision_id=decision.decision_id,
+                    result="passed" if gate_result.passed else "blocked",
+                    rule_triggered=gate_result.rule_name,
+                    checked_at=draft["occurred_at"],
+                )
+            ])
             db_session.flush()
 
             action = Action(
@@ -227,6 +224,8 @@ def run_batch(
             )
             db_session.add(action)
             db_session.flush()
+            
+        amount_at_risk_total += draft.get("amount", 0)
 
         if gate_result.passed:
             sim_outcome = simulate_outcome(draft, choice.arm, outcome_rng)
