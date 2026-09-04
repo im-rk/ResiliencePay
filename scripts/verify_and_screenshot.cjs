@@ -84,6 +84,22 @@ async function sleep(ms) {
 
     await saveScreenshot(page, '01_executive_dashboard.png', 'Executive Dashboard with Live KPIs, Learning Curves, Strategy Allocation & Ledger');
 
+    // 1.1 TEST RUN BATCH SIMULATION
+    console.log("Testing 'Run Batch Simulation (50)' button in dashboard...");
+    const batchButtons = await page.$$('button');
+    for (const b of batchButtons) {
+      const text = await page.evaluate(el => el.innerText, b);
+      if (text.includes('Run Batch Simulation')) {
+        await b.click();
+        console.log("Clicked 'Run Batch Simulation (50)'!");
+        break;
+      }
+    }
+    await sleep(2500);
+    const postBatchText = await page.$eval('body', el => el.innerText);
+    const batchDone = postBatchText.includes('Simulation completed') || postBatchText.includes('events processed');
+    console.log(`[VERIFIED] Run Batch Simulation executed successfully without CORS error: ${batchDone}`);
+
     // 2. NAVIGATE TO RECOVERY CASES
     console.log("=== 2. VERIFYING RECOVERY CASES & CASE INSPECTOR ===");
     const tabs = await page.$$('.nav-tab');

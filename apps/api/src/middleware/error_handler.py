@@ -33,8 +33,13 @@ class NotFoundError(DomainError):
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def handle_domain_error(request: Request, exc: DomainError):
+        origin = request.headers.get("origin", "*")
         return JSONResponse(
             status_code=exc.status_code,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+            },
             content={"error": True, "code": exc.code, "reason": exc.reason, **exc.context},
         )
 
@@ -42,8 +47,13 @@ def register_error_handlers(app: FastAPI) -> None:
     async def handle_unexpected_error(request: Request, exc: Exception):
         request_id = getattr(request.state, "request_id", "unknown")
         logger.exception("unhandled_exception", extra={"request_id": request_id})
+        origin = request.headers.get("origin", "*")
         return JSONResponse(
             status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+            },
             content={
                 "error": True,
                 "code": "INTERNAL_ERROR",
